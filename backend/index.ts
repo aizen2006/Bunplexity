@@ -273,6 +273,7 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
     res.header("Connection", "keep-alive");
 
     try {
+        res.write(`event: conversation\ndata: ${JSON.stringify({ conversationId: conversation.id })}\n\n`);
         for await (const chunk of llm.textStream) {
             res.write(`event: token\ndata: ${JSON.stringify({ text: chunk })}\n\n`);
         }
