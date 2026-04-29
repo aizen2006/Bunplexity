@@ -2,15 +2,31 @@
   "name": "backend",
   "module": "index.ts",
   "type": "module",
+  "scripts": {
+    "dev": "bun run index.ts"
+  },
   "private": true,
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/pg": "^8.20.0"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
+    "@pinecone-database/pinecone": "^7.2.0",
+    "@supabase/supabase-js": "^2.105.0",
+    "@tavily/core": "^0.7.2",
     "@types/express": "^5.0.6",
-    "express": "^5.2.1"
+    "ai": "^6.0.168",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "drizzle-kit": "^0.31.10",
+    "drizzle-orm": "^0.45.2",
+    "express": "^5.2.1",
+    "npm": "^11.13.0",
+    "openai": "^6.35.0",
+    "pg": "^8.20.0",
+    "zod": "^4.3.6"
   }
 }
