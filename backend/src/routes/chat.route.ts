@@ -17,7 +17,7 @@ declare global {
     }
 }
 // route that the User Hit when want to chat ( later add auth and ratelimit middleware)
-app.post("/chat" , async (req,res) => {
+app.post("/chat", authMiddleware , chatRateLimit , async (req,res) => {
     const { query , conversationId } = req.body;
     const userId = req.userId;
 
@@ -95,4 +95,4 @@ app.post("/chat" , async (req,res) => {
 });
 
 
-export { app }
+export { app };
