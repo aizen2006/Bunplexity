@@ -17,7 +17,7 @@
 ![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat-square&logo=redis)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-3ECF8E?style=flat-square&logo=supabase)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript)
-![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker)
+![Docker](https://img.shields.io/badge/Docker-Redis-2496ED?style=flat-square&logo=docker)
 
 </div>
 
@@ -34,7 +34,6 @@
 - 🗄️ **Redis response caching** on conversations & messages (1-hour TTL)
 - 🔐 **GitHub & Google OAuth** — zero-password sign-in via Supabase Auth
 - 🚦 **Per-user rate limiting** — 20 requests per minute on the chat endpoint
-- 🐳 **Docker Compose ready** — spins up backend + Redis with a single command
 
 ---
 
@@ -88,7 +87,7 @@ The frontend consumes the SSE stream with a `ReadableStream` reader, progressive
 | **Web Search** | Tavily API (advanced, 10 results) |
 | **Vector DB** | Pinecone (`chatembeddingsindex`) |
 | **Validation** | Zod 4 |
-| **Containerisation** | Docker + Docker Compose |
+| **Containerisation** | Docker (Redis) |
 
 ---
 
@@ -114,8 +113,7 @@ Bunplexity/
 │   │   ├── prompt.ts           # System prompt + response format template
 │   │   └── index.ts            # Express app setup, CORS, health routes
 │   ├── .env.example
-│   ├── DOCKERFILE
-│   └── docker_compose.yml      # backend + Redis services
+│   └── DOCKERFILE
 │
 └── frontend/                   # Next.js 16 App Router
     └── src/
@@ -140,52 +138,41 @@ Bunplexity/
 ### Prerequisites
 
 - [Bun](https://bun.sh) ≥ 1.0
-- [Docker](https://docker.com) & Docker Compose (for Redis)
+- [Docker](https://docker.com) (for Redis)
 - API keys & accounts for: [Supabase](https://supabase.com) · [NVIDIA NIM](https://build.nvidia.com) · [Tavily](https://tavily.com) · [Pinecone](https://pinecone.io) · [OpenAI](https://platform.openai.com)
 
 ---
 
-### Option A — Docker (backend + Redis, recommended)
+### Setup
 
 ```bash
 git clone https://github.com/your-username/bunplexity.git
-cd bunplexity/backend
-
-cp .env.example .env
-# Fill in all API keys in .env
-
-docker compose up -d
-# Backend → http://localhost:3001
-# Redis   → localhost:6379
 ```
 
-Then start the frontend:
+**1. Start Redis**
 
 ```bash
-cd ../frontend
-bun install
-bun run dev
-# Frontend → http://localhost:3000
+docker run -d -p 6379:6379 redis:7-alpine
 ```
 
----
-
-### Option B — Fully local (no Docker)
+**2. Backend**
 
 ```bash
-# ── Terminal 1: Backend ──────────────────────────
 cd backend
-cp .env.example .env      # fill in all keys
+cp .env.example .env   # fill in all API keys
 bun install
-bun run dev               # http://localhost:3001
+bun run dev            # http://localhost:3001
+```
 
-# ── Terminal 2: Frontend ─────────────────────────
+**3. Frontend**
+
+```bash
 cd frontend
 bun install
-bun run dev               # http://localhost:3000
+bun run dev            # http://localhost:3000
 ```
 
-> **Note:** The backend starts without Redis but caching is silently skipped. For full functionality: `docker run -d -p 6379:6379 redis:7-alpine`
+> **Without Redis:** The backend starts fine but caching is silently skipped. All features still work — just without the 1-hour response cache.
 
 ---
 
@@ -269,7 +256,7 @@ event: error          →  { "error": "Stream failed" }
 | Start command | `bun run start` |
 | Environment vars | Copy all from `backend/.env.example` |
 
-Set `FRONTEND_URL` to your Vercel production domain. Provision a Redis instance (Render Redis or Upstash) and update `REDIS_URL`.
+Set `FRONTEND_URL` to your Vercel production domain. Provision a Redis instance (Render Redis or [Upstash](https://upstash.com)) and update `REDIS_URL`.
 
 ### Frontend — Vercel
 
