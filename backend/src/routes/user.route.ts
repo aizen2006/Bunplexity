@@ -9,7 +9,7 @@ const app = express.Router();
 app.get("/me", authMiddleware, async (req, res) => {
     const [user] = await db.select().from(users).where(eq(users.id, req.userId)).limit(1);
     if (!user) {
-        return Error(" User Not Found ");
+        return res.status(404).json({ error: "User Not Found" });
     }
     return res.status(200).json({
         user: {
@@ -58,15 +58,21 @@ app.get("/conversations/:conversationId", authMiddleware, async (req, res) => {
 app.get("/conversations/:conversationId/messages", authMiddleware, async (req, res) => {
     const conversationId = req.params.conversationId as string;
 
+    const owned = await db.query.conversations.findFirst({
+        where: (c, { eq, and }) => and(eq(c.id, conversationId), eq(c.userId, req.userId)),
+    });
+    if (!owned) {
+        return res.status(404).json({ error: "Conversation not found" });
+    }
+
     const messages = await getOrSetCache(`messages:${conversationId}`,async ()=>{
         const rows = await db.query.messages.findMany({
             where: (m, { eq }) => eq(m.conversationId, conversationId),
             orderBy: (m, { desc }) => [desc(m.createdAt)],
         });
-
         return rows;
-    })
-    
+    });
+
     return res.status(200).json(messages);
 });
 

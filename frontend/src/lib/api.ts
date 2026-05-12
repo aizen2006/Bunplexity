@@ -2,6 +2,13 @@ import type { Conversation, Source, User } from '@/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
+export class AuthError extends Error {
+  constructor() {
+    super('Unauthorized');
+    this.name = 'AuthError';
+  }
+}
+
 async function request<T>(path: string, token: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -11,6 +18,7 @@ async function request<T>(path: string, token: string, options?: RequestInit): P
       ...options?.headers,
     },
   });
+  if (res.status === 401) throw new AuthError();
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json() as Promise<T>;
 }
@@ -55,6 +63,7 @@ export function streamChat(
         signal: controller.signal,
       });
 
+      if (response.status === 401) throw new AuthError();
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       if (!response.body) throw new Error('No response body');
 
@@ -85,6 +94,8 @@ export function streamChat(
               try { callbacks.onSources(JSON.parse(currentData)); } catch { /* ignore */ }
             } else if (currentEvent === 'done') {
               callbacks.onDone();
+            } else if (currentEvent === 'error') {
+              callbacks.onError(new Error('Stream failed'));
             }
             currentEvent = '';
             currentData = '';

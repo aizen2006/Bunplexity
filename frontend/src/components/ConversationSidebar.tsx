@@ -14,7 +14,13 @@ interface ConversationSidebarProps {
 
 export default function ConversationSidebar({ activeConversationId }: ConversationSidebarProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const router = useRouter();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
 
   useEffect(() => {
     (async () => {
@@ -22,6 +28,7 @@ export default function ConversationSidebar({ activeConversationId }: Conversati
         data: { session },
       } = await supabase.auth.getSession();
       if (!session) return;
+      setIsLoggedIn(true);
       try {
         const convs = await fetchConversations(session.access_token);
         setConversations(convs);
@@ -107,6 +114,27 @@ export default function ConversationSidebar({ activeConversationId }: Conversati
           </div>
         )}
       </nav>
+
+      {/* Footer */}
+      <div className="px-4 py-3 border-t flex-shrink-0" style={{ borderColor: 'var(--fg-subtle)' }}>
+        {isLoggedIn ? (
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center py-2 rounded-lg text-xs transition-opacity duration-150 hover:opacity-70"
+            style={{ color: 'var(--fg-subtle)', fontFamily: 'var(--font-mono)' }}
+          >
+            Sign out
+          </button>
+        ) : (
+          <button
+            onClick={() => router.push('/login')}
+            className="w-full flex items-center justify-center py-2 rounded-lg text-xs transition-opacity duration-150 hover:opacity-70"
+            style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}
+          >
+            Sign in
+          </button>
+        )}
+      </div>
     </motion.aside>
   );
 }

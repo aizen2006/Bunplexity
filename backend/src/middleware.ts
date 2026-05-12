@@ -6,7 +6,8 @@ const RATE_LIMIT_MAX = 20;
 const rateLimitStore = new Map<string, number[]>();
 
 export async function authMiddleware(req: Request , res: Response , next: NextFunction) {
-    const token = req.headers.authorization;
+    const raw = req.headers.authorization;
+    const token = raw?.replace(/^Bearer\s+/i, '');
     if (!token) {
         return res.status(401).json({ error: "Unauthorized" });
     }

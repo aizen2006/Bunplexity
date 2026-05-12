@@ -7,7 +7,7 @@ import ConversationSidebar from '@/components/ConversationSidebar';
 import MessageList from '@/components/MessageList';
 import ChatBar from '@/components/ChatBar';
 import { supabase } from '@/lib/supabase';
-import { fetchConversation, streamChat } from '@/lib/api';
+import { fetchConversation, streamChat, AuthError } from '@/lib/api';
 import type { Message, Source } from '@/types';
 
 interface PageProps {
@@ -24,6 +24,7 @@ function ChatContent({ conversationId }: { conversationId: string }) {
   const [streaming, setStreaming] = useState(false);
   const [title, setTitle] = useState('');
   const [authReady, setAuthReady] = useState(false);
+  const [streamError, setStreamError] = useState<string | null>(null);
 
   const tokenRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -76,6 +77,7 @@ function ChatContent({ conversationId }: { conversationId: string }) {
       setMessages(prev => [...prev, userMsg]);
       setStreamingText('');
       setSources([]);
+      setStreamError(null);
       setStreaming(true);
       streamingRef.current = true;
 
@@ -116,7 +118,13 @@ function ChatContent({ conversationId }: { conversationId: string }) {
         onError: err => {
           console.error('Stream error:', err);
           setStreaming(false);
+          setStreamingText('');
           streamingRef.current = false;
+          if (err instanceof AuthError) {
+            router.push('/login');
+            return;
+          }
+          setStreamError('Something went wrong. Please try again.');
         },
       });
     },
@@ -183,6 +191,14 @@ function ChatContent({ conversationId }: { conversationId: string }) {
             )}
           </div>
         </div>
+
+        {/* Stream error banner */}
+        {streamError && (
+          <div className="mx-6 mb-1 px-4 py-2 rounded-lg text-sm flex items-center justify-between" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171' }}>
+            <span>{streamError}</span>
+            <button onClick={() => setStreamError(null)} className="ml-3 opacity-60 hover:opacity-100 text-xs">✕</button>
+          </div>
+        )}
 
         {/* ChatBar */}
         <div

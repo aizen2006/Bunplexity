@@ -8,7 +8,10 @@ import { users} from "./db/schema";
 const app = express();
 
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    credentials: true,
+}));
 
 app.get("/health", (_req, res) => {
     return res.status(200).json({
@@ -24,13 +27,14 @@ app.get("/ready", async (_req, res) => {
         await db.select({ id: users.id }).from(users).limit(1);
         return res.status(200).json({ status: "ready" });
     } catch (error) {
-        return Error("Backend service Not Ready");
+        return res.status(503).json({ error: "Backend service Not Ready" });
     }
 });
 
 app.use('/user',user);
 app.use(chat);
 
-app.listen(process.env.PORT, () => {
-    console.log(`Server is running on port ${process.env.PORT}`);
+const PORT = process.env.PORT || '3001';
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });

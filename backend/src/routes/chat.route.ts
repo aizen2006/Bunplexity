@@ -1,5 +1,6 @@
 import express from "express";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 import { db }from "../db/index";
 import { conversations ,messages } from "../db/schema";
 import { openai } from "../lib/openai";
@@ -7,6 +8,11 @@ import { tavilyClient } from "../lib/tavily";
 import { authMiddleware , chatRateLimit } from "../middleware";
 import { PROMPT_TEMPLATE, SYSTEM_PROMPT } from "../prompt";
 const app = express.Router();
+
+const chatSchema = z.object({
+    query: z.string().min(1).max(5000),
+    conversationId: z.string().uuid(),
+});
 
 declare global {
     namespace Express {
@@ -16,20 +22,21 @@ declare global {
         }
     }
 }
-// route that the User Hit when want to chat ( later add auth and ratelimit middleware)
 app.post("/chat", authMiddleware , chatRateLimit , async (req,res) => {
-    const { query , conversationId } = req.body;
+    const parsed = chatSchema.safeParse(req.body);
+    if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
+    }
+    const { query, conversationId } = parsed.data;
     const userId = req.userId;
 
-    if(!query || !conversationId || !userId ){
-        return res.status(400).json({
-            "message":"Info Missing when request is made"
-        });
-    }
-
     const existing = await db.query.conversations.findFirst({
-        where: eq(conversations.id, conversationId)
-     });
+        where: eq(conversations.id, conversationId),
+    });
+
+    if (existing && existing.userId !== userId) {
+        return res.status(403).json({ error: "Forbidden" });
+    }
 
     // if conv not exist create a Conv title and create conv
     if ( !existing ){
@@ -74,7 +81,7 @@ app.post("/chat", authMiddleware , chatRateLimit , async (req,res) => {
     res.flushHeaders();
 
     let assistantMessage = "";
-    // Start of stream
+    let streamError = false;
     try {
         res.write(`event: conversation\ndata: ${JSON.stringify({ conversationId })}\n\n`);
         for await (const event of output) {
@@ -87,11 +94,13 @@ app.post("/chat", authMiddleware , chatRateLimit , async (req,res) => {
         res.write(`event: sources\ndata: ${JSON.stringify(sources)}\n\n`);
         res.write("event: done\ndata: {}\n\n");
     } catch (error) {
-        throw Error("Error while streaming the response")
+        streamError = true;
+        res.write(`event: error\ndata: ${JSON.stringify({ error: "Stream failed" })}\n\n`);
     }
-    res.end()
-    // end of stream
-    await db.insert(messages).values({conversationId,content:assistantMessage,role:"assistant"})
+    res.end();
+    if (!streamError && assistantMessage) {
+        await db.insert(messages).values({conversationId, content: assistantMessage, role: "assistant"});
+    }
 });
 
 

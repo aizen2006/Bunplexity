@@ -5,26 +5,27 @@ const client = createClient({
   url: process.env.REDIS_URL,
 });
 
+client.on('error', (err) => console.error('Redis error:', err));
+client.connect().catch((err) => console.error('Redis connection failed:', err));
+
 const DEFAULT_EXPIRATION = 3600;
 
 export default async function getOrSetCache(
   key: string,
   cb: () => Promise<any>
 ): Promise<any> {
-  const cachedData = await client.get(key);
+  try {
+    if (!client.isReady) return await cb();
 
-  if (cachedData) {
-    return JSON.parse(cachedData);
+    const cachedData = await client.get(key);
+    if (cachedData) return JSON.parse(cachedData);
+
+    const freshData = await cb();
+    await client.setEx(key, DEFAULT_EXPIRATION, JSON.stringify(freshData));
+    return freshData;
+  } catch (err) {
+    console.error('Cache error, falling back to fresh data:', err);
+    return await cb();
   }
-
-  const freshData = await cb();
-
-  await client.setEx(
-    key,
-    DEFAULT_EXPIRATION,
-    JSON.stringify(freshData)
-  );
-
-  return freshData;
 }
 
