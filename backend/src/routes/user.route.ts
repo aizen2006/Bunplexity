@@ -4,7 +4,7 @@ import { users } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { authMiddleware } from "../middleware";
 import getOrSetCache from "../lib/cache";
-const app = express();
+const app = express.Router();
 
 app.get("/me", authMiddleware, async (req, res) => {
     const [user] = await db.select().from(users).where(eq(users.id, req.userId)).limit(1);

@@ -1,7 +1,8 @@
 import { createClient } from 'redis';
+import 'dotenv/config';
 
 const client = createClient({
-  url: 'redis://localhost:6379',
+  url: process.env.REDIS_URL,
 });
 
 const DEFAULT_EXPIRATION = 3600;

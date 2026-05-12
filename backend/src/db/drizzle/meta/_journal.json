@@ -8,6 +8,20 @@
       "when": 1777371555050,
       "tag": "0000_shocking_the_anarchist",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1778328463287,
+      "tag": "0001_nice_green_goblin",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778329098502,
+      "tag": "0002_peaceful_mother_askani",
+      "breakpoints": true
     }
   ]
 }

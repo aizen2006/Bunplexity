@@ -6,7 +6,7 @@ import { openai } from "../lib/openai";
 import { tavilyClient } from "../lib/tavily";
 import { authMiddleware , chatRateLimit } from "../middleware";
 import { PROMPT_TEMPLATE, SYSTEM_PROMPT } from "../prompt";
-const app = express();
+const app = express.Router();
 
 declare global {
     namespace Express {

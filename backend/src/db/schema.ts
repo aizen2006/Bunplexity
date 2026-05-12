@@ -5,7 +5,7 @@ export const providerEnum = pgEnum("provider", ["google", "github", "email"]);
 export const roleEnum = pgEnum("role", ["user", "assistant"]);
 
 export const users = pgTable("users", {
-  id: uuid("id").primaryKey().defaultRandom(),
+  id: uuid("id").primaryKey(),
   email: text("email").notNull(),
   provider: providerEnum("provider").notNull(),
   name: text("name").notNull(),
