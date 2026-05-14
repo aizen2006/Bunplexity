@@ -8,7 +8,8 @@ import MessageList from '@/components/MessageList';
 import ChatBar from '@/components/ChatBar';
 import { supabase } from '@/lib/supabase';
 import { fetchConversation, streamChat, AuthError } from '@/lib/api';
-import type { Message, Source } from '@/types';
+import type { ChatModel, ChatOptions, Message, Source } from '@/types';
+import { DEFAULT_CHAT_OPTIONS } from '@/types';
 
 interface PageProps {
   params: Promise<{ conversationId: string }>;
@@ -26,15 +27,35 @@ function ChatContent({ conversationId }: { conversationId: string }) {
   const [authReady, setAuthReady] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
 
+  const [chatOptions, setChatOptions] = useState<ChatOptions>(DEFAULT_CHAT_OPTIONS);
+
   const tokenRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const startedRef = useRef(false);
-  // Ref so sendMessage always reads current streaming state without stale closure
   const streamingRef = useRef(false);
+  const chatOptionsRef = useRef<ChatOptions>(DEFAULT_CHAT_OPTIONS);
 
+  useEffect(() => { streamingRef.current = streaming; }, [streaming]);
+  useEffect(() => { chatOptionsRef.current = chatOptions; }, [chatOptions]);
+
+  // Seed mode/model from URL params once on mount
   useEffect(() => {
-    streamingRef.current = streaming;
-  }, [streaming]);
+    const modeParam = searchParams.get('mode');
+    const modelParam = searchParams.get('model');
+    const validModels: ChatModel[] = [
+      'gpt-5.5', 'gpt-5.5-pro', 'gpt-5.4', 'gpt-5.4-pro',
+      'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5', 'gpt-5-mini', 'gpt-5-nano',
+    ];
+    const seeded: ChatOptions = {
+      mode: modeParam === 'thinking' ? 'thinking' : 'fast',
+      model: validModels.includes(modelParam as ChatModel)
+        ? (modelParam as ChatModel)
+        : DEFAULT_CHAT_OPTIONS.model,
+    };
+    setChatOptions(seeded);
+    chatOptionsRef.current = seeded;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auth check
   useEffect(() => {
@@ -63,7 +84,7 @@ function ChatContent({ conversationId }: { conversationId: string }) {
   }, [authReady, conversationId]);
 
   const sendMessage = useCallback(
-    (query: string) => {
+    (query: string, options: ChatOptions = chatOptionsRef.current) => {
       if (!tokenRef.current || streamingRef.current) return;
 
       const userMsg: Message = {
@@ -86,7 +107,7 @@ function ChatContent({ conversationId }: { conversationId: string }) {
       let resolvedSources: Source[] = [];
 
       abortRef.current?.abort();
-      abortRef.current = streamChat(tokenRef.current, query, conversationId, {
+      abortRef.current = streamChat(tokenRef.current, query, conversationId, options, {
         onConversationId: id => {
           resolvedConvId = id;
           if (conversationId !== id) {
@@ -210,6 +231,7 @@ function ChatContent({ conversationId }: { conversationId: string }) {
               onSubmit={sendMessage}
               loading={streaming}
               placeholder="Ask a follow-up..."
+              defaultOptions={chatOptions}
             />
           </div>
         </div>

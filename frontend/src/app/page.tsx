@@ -5,22 +5,34 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import ChatBar from '@/components/ChatBar';
 import { supabase } from '@/lib/supabase';
+import type { ChatOptions } from '@/types';
+import { DEFAULT_CHAT_OPTIONS } from '@/types';
 
 export default function Home() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (query: string) => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+  const [chatOptions, setChatOptions] = useState<ChatOptions>(() => {
+    if (typeof window === 'undefined') return DEFAULT_CHAT_OPTIONS;
+    try {
+      const saved = localStorage.getItem('chatOptions');
+      return saved ? { ...DEFAULT_CHAT_OPTIONS, ...JSON.parse(saved) } : DEFAULT_CHAT_OPTIONS;
+    } catch { return DEFAULT_CHAT_OPTIONS; }
+  });
+
+  const handleSubmit = async (query: string, options: ChatOptions) => {
+    const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       router.push('/login');
       return;
     }
     setLoading(true);
+    setChatOptions(options);
+    try { localStorage.setItem('chatOptions', JSON.stringify(options)); } catch { /* ignore */ }
     const conversationId = crypto.randomUUID();
-    router.push(`/chat/${conversationId}?q=${encodeURIComponent(query)}`);
+    router.push(
+      `/chat/${conversationId}?q=${encodeURIComponent(query)}&mode=${options.mode}&model=${encodeURIComponent(options.model)}`
+    );
   };
 
   return (
@@ -75,6 +87,7 @@ export default function Home() {
             loading={loading}
             placeholder="Ask anything..."
             autoFocus
+            defaultOptions={chatOptions}
           />
         </motion.div>
 

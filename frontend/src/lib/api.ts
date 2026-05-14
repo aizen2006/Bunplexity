@@ -1,4 +1,4 @@
-import type { Conversation, Source, User } from '@/types';
+import type { ChatOptions, Conversation, Source, User } from '@/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -47,6 +47,7 @@ export function streamChat(
   token: string,
   query: string,
   conversationId: string,
+  options: ChatOptions,
   callbacks: StreamCallbacks
 ): AbortController {
   const controller = new AbortController();
@@ -59,7 +60,7 @@ export function streamChat(
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ query, conversationId }),
+        body: JSON.stringify({ query, conversationId, mode: options.mode, model: options.model }),
         signal: controller.signal,
       });
 

@@ -9,15 +9,15 @@
 ╚═════╝  ╚═════╝ ╚═╝  ╚═══╝╚═╝     ╚══════╝╚══════╝╚═╝  ╚═╝╚═╝   ╚═╝      ╚═╝  
 ```
 
-### An open-source Perplexity clone — powered by NVIDIA NIM, Bun & Next.js
+### An open-source Perplexity clone — powered by OpenAI, Bun & Next.js
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)
 ![Bun](https://img.shields.io/badge/Bun-1.x-fbf0df?style=flat-square&logo=bun)
 ![Express](https://img.shields.io/badge/Express-5-grey?style=flat-square&logo=express)
+![OpenAI](https://img.shields.io/badge/OpenAI-GPT--5-412991?style=flat-square&logo=openai)
 ![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat-square&logo=redis)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-3ECF8E?style=flat-square&logo=supabase)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript)
-![Docker](https://img.shields.io/badge/Docker-Redis-2496ED?style=flat-square&logo=docker)
 
 </div>
 
@@ -25,12 +25,17 @@
 
 ## ✨ Features
 
-- 🔍 **Real-time web search** via Tavily (10 results, advanced depth) on every query
-- ⚡ **Streaming AI responses** using Server-Sent Events with NVIDIA NIM MiniMax-M2.7
-- 💬 **Persistent conversations** — full message history stored in PostgreSQL
-- 🔗 **Clickable sources panel** with titles pulled from Tavily web results
+- 🔍 **Real-time web search** via Tavily on every query (basic or advanced depth, configurable by mode)
+- ⚡ **Streaming AI responses** using Server-Sent Events — answer chunks rendered progressively
+- 🧠 **Model selection** — choose from 9 OpenAI models across GPT-5.5, GPT-5.4, and GPT-5 families
+- 🔀 **Fast / Thinking modes** — Fast uses basic search + medium reasoning effort; Thinking uses advanced search + high reasoning effort
+- 💬 **Persistent conversations** — full message history stored in PostgreSQL via Drizzle ORM
+- 🔗 **Clickable sources panel** — web result titles and URLs surfaced alongside each answer
 - 🤖 **Auto-generated follow-up questions** suggested after every answer
-- 🧠 **Semantic search caching** via Pinecone (skips LLM call on ≥0.88 similarity)
+- 📚 **History tab** in sidebar — searchable/filterable conversation list with relative timestamps
+- 🚀 **Agent Mode tab** — Coming soon interface with animated "Coming Soon" badge
+- 🎨 **Microinteractions** — spring-animated mode toggle, model dropdown, staggered list animations via Framer Motion
+- 🗃️ **Semantic search caching** via Pinecone (skips LLM call on ≥0.88 cosine similarity)
 - 🗄️ **Redis response caching** on conversations & messages (1-hour TTL)
 - 🔐 **GitHub & Google OAuth** — zero-password sign-in via Supabase Auth
 - 🚦 **Per-user rate limiting** — 20 requests per minute on the chat endpoint
@@ -40,32 +45,33 @@
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────┐
-│   Browser  (Next.js :3000)  │
-│  React 19 · Tailwind CSS 4  │
-│  Framer Motion · SSE reader │
-└──────────┬──────────────────┘
-           │  POST /chat  (Bearer JWT)
-           │  GET  /user/*
+┌─────────────────────────────────┐
+│    Browser  (Next.js :3000)     │
+│  React 19 · Tailwind CSS 4      │
+│  Framer Motion · SSE reader     │
+│  Model selector · Mode toggle   │
+└──────────┬──────────────────────┘
+           │  POST /chat  { query, conversationId, mode, model }
+           │  GET  /user/*         (Bearer JWT)
            ▼
-┌─────────────────────────────┐
-│   Express API  (Bun :3001)  │
-│                             │
-│  authMiddleware      ───────│──► Supabase Auth
-│  chatRateLimit              │
-│        │                   │
-│        ▼                   │
-│  Tavily Web Search   ───────│──► 10 live results
-│        │                   │
-│  Pinecone Vector DB  ───────│──► semantic cache lookup
-│        │                   │
-│  NVIDIA NIM          ───────│──► MiniMax-M2.7 (stream)
-│        │                   │
-│  SSE stream ───────────────►│── text deltas → browser
-│        │                   │
-│  PostgreSQL (Drizzle) ──────│──► persist messages
-│  Redis cache         ───────│──► cache conversations
-└─────────────────────────────┘
+┌─────────────────────────────────┐
+│    Express API  (Bun :3001)     │
+│                                 │
+│  authMiddleware      ───────────│──► Supabase Auth (JWT verify)
+│  chatRateLimit (20/min)         │
+│         │                       │
+│         ▼                       │
+│  Tavily Web Search   ───────────│──► live results (basic / advanced)
+│         │                       │
+│  Pinecone Vector DB  ───────────│──► semantic cache lookup (≥0.88)
+│         │                       │
+│  OpenAI Responses API ──────────│──► selected model, configurable effort
+│         │                       │
+│  SSE stream ───────────────────►│── text deltas → browser
+│         │                       │
+│  PostgreSQL (Drizzle) ──────────│──► persist messages & conversations
+│  Redis cache         ───────────│──► cache conversation & message lists
+└─────────────────────────────────┘
 ```
 
 The frontend consumes the SSE stream with a `ReadableStream` reader, progressively rendering text deltas, sources, and follow-up questions as named SSE events arrive.
@@ -82,12 +88,30 @@ The frontend consumes the SSE stream with a `ReadableStream` reader, progressive
 | **Database** | PostgreSQL via Supabase + Drizzle ORM |
 | **Cache** | Redis 7 (Alpine) |
 | **Auth** | Supabase Auth — GitHub & Google OAuth |
-| **LLM** | NVIDIA NIM → MiniMax-M2.7 |
+| **LLM** | OpenAI Responses API (GPT-5.5, GPT-5.4, GPT-5 family — 9 models) |
 | **Embeddings** | OpenAI `text-embedding-3-small` |
-| **Web Search** | Tavily API (advanced, 10 results) |
+| **Web Search** | Tavily API |
 | **Vector DB** | Pinecone (`chatembeddingsindex`) |
 | **Validation** | Zod 4 |
-| **Containerisation** | Docker (Redis) |
+
+---
+
+## 🤖 Available Models
+
+| Group | Model ID | Description |
+|-------|----------|-------------|
+| **GPT-5.5** | `gpt-5.5` | New class of intelligence |
+| | `gpt-5.5-pro` | Smarter & more precise |
+| **GPT-5.4** | `gpt-5.4` | Affordable coding & professional work |
+| | `gpt-5.4-pro` | Smarter GPT-5.4-class responses |
+| | `gpt-5.4-mini` | Strongest mini for coding & agents |
+| | `gpt-5.4-nano` | Cheapest GPT-5.4-class model |
+| **GPT-5** | `gpt-5` | Intelligent reasoning, configurable effort |
+| | `gpt-5-mini` *(default)* | Cost-sensitive, low latency |
+| | `gpt-5-nano` | Fastest, most cost-efficient |
+
+**Fast mode** → basic search depth, 10 results, medium reasoning effort  
+**Thinking mode** → advanced search depth, 20 results, high reasoning effort
 
 ---
 
@@ -95,40 +119,42 @@ The frontend consumes the SSE stream with a `ReadableStream` reader, progressive
 
 ```
 Bunplexity/
-├── backend/                    # Bun + Express API
+├── backend/                        # Bun + Express API
 │   ├── src/
 │   │   ├── db/
-│   │   │   ├── schema.ts       # Drizzle ORM — users, conversations, messages
-│   │   │   └── index.ts        # DB connection
+│   │   │   ├── schema.ts           # Drizzle ORM — users, conversations, messages
+│   │   │   └── index.ts            # DB connection
 │   │   ├── lib/
-│   │   │   ├── cache.ts        # Redis get-or-set helper
-│   │   │   ├── client.ts       # Supabase admin client
-│   │   │   ├── openai.ts       # NVIDIA NIM (OpenAI-compatible endpoint)
-│   │   │   ├── pinecone.ts     # Semantic search cache
-│   │   │   └── tavily.ts       # Web search client
+│   │   │   ├── cache.ts            # Redis get-or-set helper
+│   │   │   ├── client.ts           # Supabase admin client
+│   │   │   ├── openai.ts           # OpenAI client (LLM + embeddings)
+│   │   │   ├── pinecone.ts         # Semantic search cache
+│   │   │   └── tavily.ts           # Web search client
 │   │   ├── routes/
-│   │   │   ├── chat.route.ts   # POST /chat — streaming SSE endpoint
-│   │   │   └── user.route.ts   # /user/me, /conversations, /messages
-│   │   ├── middleware.ts        # JWT auth + in-memory rate limiter
-│   │   ├── prompt.ts           # System prompt + response format template
-│   │   └── index.ts            # Express app setup, CORS, health routes
-│   ├── .env.example
-│   └── DOCKERFILE
+│   │   │   ├── chat.route.ts       # POST /chat + POST /chat/follow-up
+│   │   │   └── user.route.ts       # /user/me, /conversations, /messages
+│   │   ├── middleware.ts            # JWT auth + in-memory rate limiter
+│   │   ├── prompt.ts               # System prompt + response format template
+│   │   └── index.ts                # Express app setup, CORS, health routes
+│   └── .env.example
 │
-└── frontend/                   # Next.js 16 App Router
+└── frontend/                       # Next.js 16 App Router
     └── src/
         ├── app/
-        │   ├── page.tsx            # Home / search landing
-        │   ├── login/              # GitHub + Google OAuth
-        │   └── chat/[id]/          # Streaming chat interface
+        │   ├── page.tsx                # Home / search landing
+        │   ├── login/                  # GitHub + Google OAuth
+        │   └── chat/[conversationId]/  # Streaming chat interface
         ├── components/
-        │   ├── ConversationSidebar.tsx
-        │   ├── MessageBubble.tsx   # Markdown parser + follow-ups
-        │   ├── SourcesPanel.tsx
-        │   └── ChatBar.tsx
-        └── lib/
-            ├── api.ts              # fetch wrapper + SSE stream consumer
-            └── supabase.ts         # Supabase browser client
+        │   ├── ConversationSidebar.tsx # History tab + Agent Mode tab
+        │   ├── ChatBar.tsx             # Input + mode toggle + model selector
+        │   ├── MessageList.tsx         # Message thread + follow-up questions
+        │   ├── MessageBubble.tsx       # Markdown parser
+        │   └── SourcesPanel.tsx        # Web result cards
+        ├── lib/
+        │   ├── api.ts                  # fetch wrapper + SSE stream consumer
+        │   └── supabase.ts             # Supabase browser client
+        └── types/
+            └── index.ts                # Shared types incl. ChatOptions, ChatModel
 ```
 
 ---
@@ -139,7 +165,7 @@ Bunplexity/
 
 - [Bun](https://bun.sh) ≥ 1.0
 - [Docker](https://docker.com) (for Redis)
-- API keys & accounts for: [Supabase](https://supabase.com) · [NVIDIA NIM](https://build.nvidia.com) · [Tavily](https://tavily.com) · [Pinecone](https://pinecone.io) · [OpenAI](https://platform.openai.com)
+- API keys for: [Supabase](https://supabase.com) · [OpenAI](https://platform.openai.com) · [Tavily](https://tavily.com) · [Pinecone](https://pinecone.io)
 
 ---
 
@@ -188,14 +214,11 @@ bun run dev            # http://localhost:3000
 | `REDIS_URL` | ✅ | Redis connection (default: `redis://localhost:6379`) |
 | `SUPABASE_URL` | ✅ | Supabase project URL |
 | `SUPABASE_API_KEY_SECRET` | ✅ | Supabase **service role** key — keep this secret |
-| `NVIDIA_API_KEY` | ✅ | NVIDIA NIM key for MiniMax-M2.7 inference |
-| `OPENAI_API_KEY` | ✅ | OpenAI key — used for `text-embedding-3-small` only |
+| `OPENAI_API_KEY` | ✅ | OpenAI key — used for LLM inference (all chat models) and `text-embedding-3-small` |
 | `TAVILY_API_KEY` | ✅ | Tavily web search API key |
 | `PINECONE_API_KEY` | ✅ | Pinecone API key |
-| `GITHUB_CLIENT_ID` | ✅ | GitHub OAuth App client ID |
-| `GITHUB_CLIENT_SECRET` | ✅ | GitHub OAuth App client secret |
-| `GOOGLE_CLIENT_ID` | ✅ | Google OAuth 2.0 client ID |
-| `GOOGLE_CLIENT_SECRET` | ✅ | Google OAuth 2.0 client secret |
+
+> GitHub and Google OAuth credentials are configured directly in the Supabase dashboard (Auth → Providers) — no backend env vars needed.
 
 ### `frontend/.env.local`
 
@@ -213,7 +236,8 @@ bun run dev            # http://localhost:3000
 |--------|------|:----:|-------------|
 | `GET` | `/health` | — | Service health check |
 | `GET` | `/ready` | — | DB readiness probe |
-| `POST` | `/chat` | ✅ | Stream AI response — **rate limited 20 req/min** |
+| `POST` | `/chat` | ✅ | Start a new chat — streams SSE response, **rate limited 20 req/min** |
+| `POST` | `/chat/follow-up` | ✅ | Follow-up query in an existing conversation — same SSE format |
 | `GET` | `/user/me` | ✅ | Authenticated user profile |
 | `GET` | `/user/conversations` | ✅ | List all conversations (Redis cached) |
 | `GET` | `/user/conversations/:id` | ✅ | Conversation + messages (Redis cached) |
@@ -221,7 +245,23 @@ bun run dev            # http://localhost:3000
 
 All protected routes require `Authorization: Bearer <supabase_access_token>`.
 
-#### SSE Stream Events — `POST /chat`
+#### Request Body — `POST /chat` and `POST /chat/follow-up`
+
+```json
+{
+  "query": "What is the latest in quantum computing?",
+  "conversationId": "uuid-v4",
+  "mode": "fast",
+  "model": "gpt-5-mini"
+}
+```
+
+| Field | Type | Values |
+|-------|------|--------|
+| `mode` | `"fast" \| "thinking"` | `fast` → basic search, medium effort · `thinking` → advanced search, high effort |
+| `model` | `string` | Any model ID from the [Available Models](#-available-models) table |
+
+#### SSE Stream Events
 
 ```
 event: conversation   →  { "conversationId": "uuid" }
@@ -235,13 +275,14 @@ event: error          →  { "error": "Stream failed" }
 
 ## 🔄 How It Works
 
-1. **User submits a query** → frontend POSTs `{ query, conversationId }` with a Supabase Bearer token
+1. **User submits a query** with a selected model and mode → frontend POSTs `{ query, conversationId, mode, model }` with a Supabase Bearer token
 2. **Auth & rate limit** → backend validates the JWT via Supabase, enforces 20 req/min per user
-3. **Web search** → query sent to **Tavily** — returns 10 live web results
-4. **Semantic cache check** → query embedding compared against **Pinecone**; a hit at ≥0.88 cosine similarity short-circuits the LLM call entirely
-5. **LLM inference** → search results + query injected into a structured prompt, streamed through **NVIDIA NIM** (MiniMax-M2.7)
-6. **SSE to browser** → answer chunks, sources, and follow-up questions arrive as named events; frontend renders progressively
-7. **Persistence** → complete assistant message written to **PostgreSQL**; conversation lists refreshed in **Redis**
+3. **Embedding** → query is embedded via `text-embedding-3-small` in parallel with conversation setup
+4. **Semantic cache check** → embedding compared against **Pinecone**; a hit at ≥0.88 cosine similarity returns cached web results, skipping Tavily
+5. **Web search** → if no cache hit, query sent to **Tavily** (10 results in Fast, 20 in Thinking)
+6. **LLM inference** → search results + query injected into a structured prompt, streamed through **OpenAI Responses API** using the user's chosen model and reasoning effort
+7. **SSE to browser** → answer chunks, sources, and follow-up questions arrive as named events; frontend renders progressively
+8. **Persistence** → complete assistant message written to **PostgreSQL**; conversation lists invalidated in **Redis**
 
 ---
 
@@ -256,7 +297,7 @@ event: error          →  { "error": "Stream failed" }
 | Start command | `bun run start` |
 | Environment vars | Copy all from `backend/.env.example` |
 
-Set `FRONTEND_URL` to your Vercel production domain. Provision a Redis instance (Render Redis or [Upstash](https://upstash.com)) and update `REDIS_URL`.
+Set `FRONTEND_URL` to your Vercel production domain. Provision a Redis instance ([Upstash](https://upstash.com) works well on both platforms) and update `REDIS_URL`.
 
 ### Frontend — Vercel
 
