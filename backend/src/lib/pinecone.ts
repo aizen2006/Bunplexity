@@ -1,16 +1,14 @@
 import { Pinecone } from '@pinecone-database/pinecone';
-import { generateText } from 'ai';
-import OpenAI from "openai";
+import { openai } from './openai';
 import 'dotenv/config';
 
-export const pinecone = new Pinecone({
+export const pc = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!
 });
 
-const openai = new OpenAI();
-
 const indexName = "chatembeddingsindex";
-await pinecone.createIndexForModel({
+
+await pc.createIndexForModel({
   name: indexName,
   cloud: 'aws',
   region: 'us-east-1',
@@ -20,23 +18,7 @@ await pinecone.createIndexForModel({
   },
   waitUntilReady: true,
 });
-const index = pinecone.index(indexName);
-
-// Helper functions
-
-async function rewriteQuery(query: string) {
-    const res: any = await generateText({
-      model: "openai/gpt-4o-mini",
-      prompt: `
-      Rewrite this into a short, search-optimized query.
-      Keep intent same.
-  
-      Query: ${query}
-      `,
-    });
-  
-    return res.text.trim();
-}
+const index = pc.index({ name: indexName });
 
 async function getEmbedding(text: string) {
     const res = await openai.embeddings.create({
@@ -47,40 +29,40 @@ async function getEmbedding(text: string) {
     return res.data[0]?.embedding;
   }
 
-async function findCachedResult(embedding: number[]) {
-    const res = await index.query({
-        vector: embedding,
-        topK: 1,
-        includeMetadata: true,
-    });
+async function findCachedResult(embedding: number[]): Promise<any[] | null> {
+  const res = await index.query({
+      vector: embedding,
+      topK: 1,                    // return the single best match
+      includeMetadata: true,
+  });
 
-    const match = res.matches?.[0];
+  const match = res.matches?.[0];
 
-    // Use only high-confidence matches to avoid serving unrelated cached answers.
-    if (match && match.score && match.score > 0.88) {
-        return match.metadata;
-    }
+  if (!match || !match.score || match.score < 0.92) return null;
 
-    return null;
+  // metadata.results is stored as a JSON string — parse it back to any[]
+  const raw = match.metadata?.results;
+  if (!raw || typeof raw !== "string") return null;
+
+  try {
+      return JSON.parse(raw) as any[];
+  } catch {
+      return null;  // corrupted cache entry — treat as miss
+  }
 }
 
-async function storeInCache(
-    embedding: number[],
-    data: any
-  ) {
-    // Pinecone metadata supports scalar values, so nested search results are stringified.
-    await index.upsert({
-      records: [
-      {
-        id: crypto.randomUUID(),
-        values: embedding,
-        metadata: {
-          ...data,
-          searchResults: JSON.stringify(data.searchResults),
-          timestamp: Date.now(),
-        },
-      },
-    ]});
-  }
+async function storeInCache(embedding: number[], data: any): Promise<void> {
+  const results = data.results ?? [];
 
-export { rewriteQuery, getEmbedding, findCachedResult, storeInCache };
+  await index.upsert({
+      records: [{
+          id: crypto.randomUUID(),
+          values: embedding,
+          metadata: {
+              results: JSON.stringify(results), // matches what findCachedResult reads
+              cachedAt: Date.now(),
+          },
+      }],
+  });
+}
+export { getEmbedding, findCachedResult, storeInCache };
