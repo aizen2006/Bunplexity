@@ -25,7 +25,7 @@ app.get("/me", authMiddleware, async (req, res) => {
 
 app.get("/conversations",authMiddleware, async (req, res) => {
     // cache converstion if not cached 
-    const conversations = await getOrSetCache(`conversations?${req.userId}`,async()=>{
+    const conversations = await getOrSetCache(`conversations:${req.userId}`,async()=>{
         const rows = await db.query.conversations.findMany({
             where: (c, { eq }) => eq(c.userId, req.userId),
             orderBy: (c, { desc }) => [desc(c.createdAt)],
@@ -44,7 +44,7 @@ app.get("/conversations/:conversationId", authMiddleware, async (req, res) => {
             where: (c, { eq, and }) => and(eq(c.id, conversationId), eq(c.userId, req.userId)),
             with: {
                 messages: {
-                    orderBy: (m, { desc }) => [desc(m.createdAt)],
+                    orderBy: (m, { asc }) => [asc(m.createdAt)],
                 },
             },
         });
@@ -68,7 +68,7 @@ app.get("/conversations/:conversationId/messages", authMiddleware, async (req, r
     const messages = await getOrSetCache(`messages:${conversationId}`,async ()=>{
         const rows = await db.query.messages.findMany({
             where: (m, { eq }) => eq(m.conversationId, conversationId),
-            orderBy: (m, { desc }) => [desc(m.createdAt)],
+            orderBy: (m, { asc }) => [asc(m.createdAt)],
         });
         return rows;
     });

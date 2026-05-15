@@ -3,6 +3,7 @@ import cors from "cors";
 import { app as user } from "./routes/user.route";
 import { app as chat } from "./routes/chat.route";
 import { app as admin } from "./routes/admin.routes";
+import { adminMiddleware } from "./middleware";
 import { db } from "./db/index";
 import { users} from "./db/schema";
 
@@ -31,7 +32,7 @@ app.get("/ready", async (_req, res) => {
         return res.status(503).json({ error: "Backend service Not Ready" });
     }
 });
-app.use('/admin',admin);
+app.use('/admin', adminMiddleware, admin);
 app.use('/user',user);
 app.use(chat);
 

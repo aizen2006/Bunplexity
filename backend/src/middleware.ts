@@ -79,3 +79,11 @@ export function chatRateLimit(req: Request, res: Response, next: NextFunction) {
     rateLimitStore.set(key, withinWindow);
     next();
 }
+
+export function adminMiddleware(req: Request, res: Response, next: NextFunction) {
+    const secret = req.headers['x-admin-secret'];
+    if (!process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET) {
+        return res.status(403).json({ error: "Forbidden" });
+    }
+    next();
+}

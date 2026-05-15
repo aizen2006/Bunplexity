@@ -39,12 +39,14 @@ app.post('/user', async( req , res ) => {
         })
     } 
 });
+const deleteUserSchema = z.object({ email: z.string().email() });
+
 app.delete('/user',async( req , res ) => {
-    const user = userSchema.safeParse(req.body);
-    if (!user.success) {
-        return res.status(400).json({ error: "Invalid input", details: user.error.flatten() });
+    const parsed = deleteUserSchema.safeParse(req.body);
+    if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
     }
-    const { email } = user.data;
+    const { email } = parsed.data;
     try {
         await db.delete(users).where(eq(users.email,email));
         return res.status(200).json({

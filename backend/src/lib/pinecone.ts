@@ -6,8 +6,8 @@ export const pc = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!
 });
 
-const indexName ='quickstart';
-const index = pc.index({ name: indexName });
+const indexName = 'quickstart';
+const index = pc.index(indexName);
 
 async function getEmbedding(text: string) {
     const res = await openai.embeddings.create({
@@ -43,15 +43,13 @@ async function findCachedResult(embedding: number[]): Promise<any[] | null> {
 async function storeInCache(embedding: number[], data: any): Promise<void> {
   const results = data.results ?? [];
 
-  await index.upsert({
-      records: [{
-          id: crypto.randomUUID(),
-          values: embedding,
-          metadata: {
-              results: JSON.stringify(results), // matches what findCachedResult reads
-              cachedAt: Date.now(),
-          },
-      }],
-  });
+  await index.upsert([{
+      id: crypto.randomUUID(),
+      values: embedding,
+      metadata: {
+          results: JSON.stringify(results),
+          cachedAt: Date.now(),
+      },
+  }]);
 }
 export { getEmbedding, findCachedResult, storeInCache };

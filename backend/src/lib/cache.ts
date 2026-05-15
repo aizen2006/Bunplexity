@@ -29,3 +29,12 @@ export default async function getOrSetCache(
   }
 }
 
+export async function invalidateCache(key: string): Promise<void> {
+  try {
+    if (!client.isReady) return;
+    await client.del(key);
+  } catch (err) {
+    console.error('Cache invalidation error:', err);
+  }
+}
+

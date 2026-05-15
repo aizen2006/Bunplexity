@@ -38,8 +38,10 @@ export const PROMPT_TEMPLATE =`
 
 `
 export const FOLLOW_UP_PROMPT_TEMPLATE = `
-    
-    # USER_QUERY 
+    ## Web search results
+    {{WEB_SEARCH_RESULTS}}
+
+    # USER_QUERY
     {{USER_QUERY}}
 
     # CONVERSATION_HISTORY
