@@ -41,7 +41,7 @@ declare global {
         }
     }
 }
-app.post("/chat", async (req, res) => {
+app.post("/chat", authMiddleware , chatRateLimit, async (req, res) => {
     const parsed = chatSchema.safeParse(req.body);
     if (!parsed.success) {
         return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
