@@ -54,7 +54,7 @@ function ConversationItem({
           whileHover={{ scaleY: 1, opacity: 1 }}
           transition={{ duration: 0.15 }}
         />
-        <span className="truncate flex-1 pl-1">{conv.title}</span>
+        <span className="truncate flex-1 pl-1">{conv.title ?? 'Untitled'}</span>
         <span
           className="text-[10px] ml-2 flex-shrink-0 opacity-0 group-hover:opacity-60 transition-opacity duration-150"
           style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}
@@ -84,7 +84,7 @@ function HistoryTab({
   const filtered = useMemo(
     () =>
       searchQuery.trim()
-        ? conversations.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase()))
+        ? conversations.filter(c => (c.title ?? '').toLowerCase().includes(searchQuery.toLowerCase()))
         : conversations,
     [conversations, searchQuery]
   );

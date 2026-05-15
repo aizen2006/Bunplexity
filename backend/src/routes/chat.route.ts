@@ -132,8 +132,8 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
         }
 
         const sources = webSearchResult.map((r: any) => ({ url: r.url, title: r.title }));
-        res.write(`event: sources\ndata: ${JSON.stringify(sources)}\n\n`);
-        res.write("event: done\ndata: {}\n\n");
+        res.write(`\nevent: sources\ndata: ${JSON.stringify(sources)}\n\n`);
+        res.write("\nevent: done\ndata: {}\n\n");
     } catch (err) {
         streamError = true;
         console.error("Stream error:", err);
@@ -245,8 +245,8 @@ app.post("/chat/follow-up", authMiddleware, chatRateLimit, async (req, res) => {
         }
 
         const sources = webSearchResult.map((r: any) => ({ url: r.url, title: r.title }));
-        res.write(`event: sources\ndata: ${JSON.stringify(sources)}\n\n`);
-        res.write("event: done\ndata: {}\n\n");
+        res.write(`\nevent: sources\ndata: ${JSON.stringify(sources)}\n\n`);
+        res.write("\nevent: done\ndata: {}\n\n");
     } catch (err) {
         streamError = true;
         console.error("Stream error:", err);

@@ -48,13 +48,14 @@ export function streamChat(
   query: string,
   conversationId: string,
   options: ChatOptions,
-  callbacks: StreamCallbacks
+  callbacks: StreamCallbacks,
+  endpoint: '/chat' | '/chat/follow-up' = '/chat'
 ): AbortController {
   const controller = new AbortController();
 
   (async () => {
     try {
-      const response = await fetch(`${API_BASE}/chat`, {
+      const response = await fetch(`${API_BASE}${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

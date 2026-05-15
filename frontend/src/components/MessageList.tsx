@@ -53,9 +53,9 @@ export default function MessageList({
         <div className="space-y-3">
           {sources.length > 0 ? (
             <SourcesPanel sources={sources} />
-          ) : streamingText === '' ? (
+          ) : (
             <SourcesPanel sources={[]} loading />
-          ) : null}
+          )}
           {streamingText && (
             <MessageBubble role="assistant" content={streamingText} streaming />
           )}

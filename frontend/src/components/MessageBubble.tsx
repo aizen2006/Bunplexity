@@ -61,7 +61,7 @@ function AssistantContent({ content, streaming }: { content: string; streaming?:
     const line = lines[i];
 
     // Skip XML tags from follow-ups block
-    if (line.startsWith('<') && (line.includes('FOLLOW_UPS') || line.includes('question'))) {
+    if (line.startsWith('<') && (line.includes('FOLLOW_UPS') || line.includes('question') || line.includes('ANSWER'))) {
       i++;
       continue;
     }

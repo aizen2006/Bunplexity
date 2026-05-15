@@ -38,6 +38,9 @@ function ChatContent({ conversationId }: { conversationId: string }) {
   useEffect(() => { streamingRef.current = streaming; }, [streaming]);
   useEffect(() => { chatOptionsRef.current = chatOptions; }, [chatOptions]);
 
+  const messagesRef = useRef<Message[]>([]);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+
   // Seed mode/model from URL params once on mount
   useEffect(() => {
     const modeParam = searchParams.get('mode');
@@ -107,6 +110,7 @@ function ChatContent({ conversationId }: { conversationId: string }) {
       let resolvedSources: Source[] = [];
 
       abortRef.current?.abort();
+      const endpoint = messagesRef.current.length > 0 ? '/chat/follow-up' : '/chat';
       abortRef.current = streamChat(tokenRef.current, query, conversationId, options, {
         onConversationId: id => {
           resolvedConvId = id;
@@ -147,7 +151,7 @@ function ChatContent({ conversationId }: { conversationId: string }) {
           }
           setStreamError('Something went wrong. Please try again.');
         },
-      });
+      }, endpoint);
     },
     [conversationId, router]
   );

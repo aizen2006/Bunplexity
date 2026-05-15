@@ -168,6 +168,11 @@ export default function ChatBar({
     return () => document.removeEventListener('mousedown', handler);
   }, [modelOpen]);
 
+  useEffect(() => {
+    if (defaultOptions?.mode) setMode(defaultOptions.mode);
+    if (defaultOptions?.model) setModel(defaultOptions.model);
+  }, [defaultOptions?.mode, defaultOptions?.model]);
+
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();
     if (!trimmed || loading) return;
