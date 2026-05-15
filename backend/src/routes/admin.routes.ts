@@ -1,12 +1,10 @@
 import express from "express";
 import { db } from "../db";
-import { users } from "../db/schema";
+import { conversations, users } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { z } from 'zod';
 
 // these route are just for testing purposes
-
-const app = express.Router();
 const userSchema = z.object({
     id:z.string().describe("its a uuid"),
     name:z.string(),
@@ -14,6 +12,12 @@ const userSchema = z.object({
     provider:z.enum(["google", "github", "email"])
 })
 
+const convSchema = z.object({
+    title:z.string(),
+    userId:z.string()
+})
+
+const app = express.Router();
 
 // user crud routes
 app.post('/user', async( req , res ) => {   
@@ -70,6 +74,19 @@ app.patch('/user',async( req , res ) => {
         })
     }
 });
+
+// create conversation
+app.post('/conv', async(req,res) => {
+    const conv = convSchema.safeParse(req.body);
+    if(!conv.success) return res.status(400).json({message:'failed to parse the input'});
+    const { title , userId  } = conv.data;
+    try {
+        await db.insert(conversations).values({title,userId});
+        return res.status(200).json({message:'Successfully Create the conversation'});
+    } catch (error) {
+        return res.status(400).json({message:'failed to create the conversation'});
+    }
+})
 
 // credit crud routes
 {/*  credit system will*/}
