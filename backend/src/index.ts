@@ -32,9 +32,16 @@ app.get("/ready", async (_req, res) => {
         return res.status(503).json({ error: "Backend service Not Ready" });
     }
 });
-// app.use('/admin', adminMiddleware, admin);
-// app.use('/user',user);
+app.use('/admin', adminMiddleware, admin);
+app.use('/user',user);
 app.use(chat);
+
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error("Unhandled error:", err);
+    if (!res.headersSent) {
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
 
 const PORT = process.env.PORT || '3001';
 app.listen(PORT, () => {
