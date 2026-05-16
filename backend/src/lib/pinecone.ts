@@ -9,13 +9,17 @@ export const pc = new Pinecone({
 const indexName = 'quickstart';
 const index = pc.index(indexName);
 
-async function getEmbedding(text: string) {
+async function getEmbedding(text: string): Promise<number[]> {
     const res = await openai.embeddings.create({
       model: "text-embedding-3-small",
       input: text,
     });
-  
-    return res.data[0]?.embedding;
+
+    const embedding = res.data[0]?.embedding;
+    if (!embedding || embedding.length === 0) {
+      throw new Error("Embedding service returned empty vector");
+    }
+    return embedding;
   }
 
 async function findCachedResult(embedding: number[]): Promise<any[] | null> {
@@ -43,13 +47,15 @@ async function findCachedResult(embedding: number[]): Promise<any[] | null> {
 async function storeInCache(embedding: number[], data: any): Promise<void> {
   const results = data.results ?? [];
 
-  await index.upsert([{
-      id: crypto.randomUUID(),
+  await index.upsert({
+    records:[{
+      
+    id: crypto.randomUUID(),
       values: embedding,
       metadata: {
           results: JSON.stringify(results),
           cachedAt: Date.now(),
       },
-  }]);
+  }]});
 }
 export { getEmbedding, findCachedResult, storeInCache };

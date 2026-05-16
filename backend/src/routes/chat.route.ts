@@ -37,6 +37,13 @@ declare global {
     }
 }
 
+function streamErrorPayload(err: unknown): { error: string } {
+    if (err instanceof Error) {
+        return { error: err.message.slice(0, 500) };
+    }
+    return { error: "Unknown stream error" };
+}
+
 // ── POST /chat ───────────────────────────────────────────────────────────────
 app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
     const parsed = chatSchema.safeParse(req.body);
@@ -55,27 +62,37 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
         // ── 1. Conversation check + embedding in parallel ─────────────────────
         const [existing, embeddings] = await Promise.all([
             db.query.conversations.findFirst({ where: eq(conversations.id, conversationId) }),
-            getEmbedding(query) as Promise<number[]>,
+            getEmbedding(query),
         ]);
 
         if (existing && existing.userId !== userId) {
             return res.status(403).json({ error: "Forbidden" });
         }
 
-        // ── 2. Create conversation before inserting message ───────────────────
+        // ── 2. Create conversation with placeholder title; refine in background
         if (!existing) {
-            const titleRes = await openai.responses.create({
-                model: "gpt-5.4-mini",
-                input: `Generate a concise title (5 words or fewer) for this query: ${query}`,
-            });
             await db.insert(conversations).values({
                 id: conversationId,
-                title: titleRes.output_text?.trim() ?? "New chat",
+                title: "New chat",
                 userId,
             });
             invalidateCache(`conversations:${userId}`).catch(err =>
                 console.error("Cache invalidation failed:", err)
             );
+
+            openai.responses.create({
+                model: "gpt-5.4-mini",
+                input: `Generate a concise title (5 words or fewer) for this query: ${query}`,
+            })
+                .then(r => {
+                    const title = r.output_text?.trim();
+                    if (!title) return;
+                    return db.update(conversations)
+                        .set({ title })
+                        .where(eq(conversations.id, conversationId))
+                        .then(() => invalidateCache(`conversations:${userId}`));
+                })
+                .catch(err => console.error("Title generation failed:", err));
         }
 
         // ── 3. Insert user message + semantic cache check in parallel ─────────
@@ -111,7 +128,7 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
         });
     } catch (err) {
         console.error("Pre-stream error:", err);
-        return res.status(500).json({ error: "Failed to process request" });
+        return res.status(500).json(streamErrorPayload(err));
     }
 
     // ── 6. Stream response via SSE ────────────────────────────────────────────
@@ -121,7 +138,6 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
     res.flushHeaders();
 
     let assistantMessage = "";
-    let streamError = false;
 
     try {
         res.write(`event: conversation\ndata: ${JSON.stringify({ conversationId })}\n\n`);
@@ -129,27 +145,24 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
         for await (const event of output) {
             if (event.type === "response.output_text.delta") {
                 assistantMessage += event.delta;
-                res.write(event.delta);
+                res.write(`event: delta\ndata: ${JSON.stringify({ text: event.delta })}\n\n`);
             } else if (event.type === "response.failed") {
                 throw new Error(event.response?.error?.message ?? "OpenAI response failed");
-            } else if (event.type === "response.incomplete") {
-                throw new Error("OpenAI response incomplete");
             }
         }
 
         const sources = webSearchResult.map((r: any) => ({ url: r.url, title: r.title }));
-        res.write(`\nevent: sources\ndata: ${JSON.stringify(sources)}\n\n`);
-        res.write("\nevent: done\ndata: {}\n\n");
+        res.write(`event: sources\ndata: ${JSON.stringify(sources)}\n\n`);
+        res.write(`event: done\ndata: {}\n\n`);
     } catch (err) {
-        streamError = true;
         console.error("Stream error:", err);
-        res.write(`event: error\ndata: ${JSON.stringify({ error: "Stream failed" })}\n\n`);
+        res.write(`event: error\ndata: ${JSON.stringify(streamErrorPayload(err))}\n\n`);
     } finally {
         res.end();
     }
 
-    // ── 7. Persist assistant message + bust caches (fire-and-forget) ──────────
-    if (!streamError && assistantMessage) {
+    // ── 7. Persist whatever assistant text we produced (even on partial error)
+    if (assistantMessage) {
         db.insert(messages)
             .values({ conversationId, content: assistantMessage, role: "assistant" })
             .then(() => Promise.all([
@@ -179,7 +192,7 @@ app.post("/chat/follow-up", authMiddleware, chatRateLimit, async (req, res) => {
         // ── 1. Auth check + embedding in parallel ─────────────────────────────
         const [existing, embeddings] = await Promise.all([
             db.query.conversations.findFirst({ where: eq(conversations.id, conversationId) }),
-            getEmbedding(query) as Promise<number[]>,
+            getEmbedding(query),
         ]);
 
         if (!existing) {
@@ -233,7 +246,7 @@ app.post("/chat/follow-up", authMiddleware, chatRateLimit, async (req, res) => {
         });
     } catch (err) {
         console.error("Pre-stream error:", err);
-        return res.status(500).json({ error: "Failed to process request" });
+        return res.status(500).json(streamErrorPayload(err));
     }
 
     // ── 6. Stream response via SSE ────────────────────────────────────────────
@@ -243,7 +256,6 @@ app.post("/chat/follow-up", authMiddleware, chatRateLimit, async (req, res) => {
     res.flushHeaders();
 
     let assistantMessage = "";
-    let streamError = false;
 
     try {
         res.write(`event: conversation\ndata: ${JSON.stringify({ conversationId })}\n\n`);
@@ -251,27 +263,24 @@ app.post("/chat/follow-up", authMiddleware, chatRateLimit, async (req, res) => {
         for await (const event of output) {
             if (event.type === "response.output_text.delta") {
                 assistantMessage += event.delta;
-                res.write(event.delta);
+                res.write(`event: delta\ndata: ${JSON.stringify({ text: event.delta })}\n\n`);
             } else if (event.type === "response.failed") {
                 throw new Error(event.response?.error?.message ?? "OpenAI response failed");
-            } else if (event.type === "response.incomplete") {
-                throw new Error("OpenAI response incomplete");
             }
         }
 
         const sources = webSearchResult.map((r: any) => ({ url: r.url, title: r.title }));
-        res.write(`\nevent: sources\ndata: ${JSON.stringify(sources)}\n\n`);
-        res.write("\nevent: done\ndata: {}\n\n");
+        res.write(`event: sources\ndata: ${JSON.stringify(sources)}\n\n`);
+        res.write(`event: done\ndata: {}\n\n`);
     } catch (err) {
-        streamError = true;
         console.error("Stream error:", err);
-        res.write(`event: error\ndata: ${JSON.stringify({ error: "Stream failed" })}\n\n`);
+        res.write(`event: error\ndata: ${JSON.stringify(streamErrorPayload(err))}\n\n`);
     } finally {
         res.end();
     }
 
-    // ── 7. Persist assistant message + bust caches (fire-and-forget) ──────────
-    if (!streamError && assistantMessage) {
+    // ── 7. Persist whatever assistant text we produced (even on partial error)
+    if (assistantMessage) {
         db.insert(messages)
             .values({ conversationId, content: assistantMessage, role: "assistant" })
             .then(() => Promise.all([

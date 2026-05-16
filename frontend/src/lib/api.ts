@@ -92,29 +92,22 @@ export function streamChat(
             // SSE event dispatch on empty line
             if (currentEvent === 'conversation') {
               try { callbacks.onConversationId(JSON.parse(currentData).conversationId); } catch { /* ignore */ }
+            } else if (currentEvent === 'delta') {
+              try { callbacks.onChunk(JSON.parse(currentData).text); } catch { /* ignore */ }
             } else if (currentEvent === 'sources') {
               try { callbacks.onSources(JSON.parse(currentData)); } catch { /* ignore */ }
             } else if (currentEvent === 'done') {
               callbacks.onDone();
             } else if (currentEvent === 'error') {
-              callbacks.onError(new Error('Stream failed'));
+              let msg = 'Stream failed';
+              try { msg = JSON.parse(currentData).error ?? msg; } catch { /* ignore */ }
+              callbacks.onError(new Error(msg));
             }
             currentEvent = '';
             currentData = '';
-          } else {
-            // Raw streaming text delta
-            callbacks.onChunk(line + '\n');
           }
         }
-
-        // Emit buffered non-SSE content as text (handles deltas without newlines)
-        if (buffer && !buffer.startsWith('event: ') && !buffer.startsWith('data: ')) {
-          callbacks.onChunk(buffer);
-          buffer = '';
-        }
       }
-
-      if (buffer) callbacks.onChunk(buffer);
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
         callbacks.onError(err as Error);
