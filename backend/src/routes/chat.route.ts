@@ -19,6 +19,7 @@ const ALLOWED_MODELS = [
 ] as const;
 
 const chatSchema = z.object({
+    userId:z.string(),
     mode: z.enum(['thinking', 'fast']),
     query: z.string().min(1).max(5000),
     model: z.enum(ALLOWED_MODELS),
@@ -46,8 +47,8 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
         return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
     }
 
-    const { query, model, mode, conversationId } = parsed.data;
-    const userId = req.userId;
+    const { query, model, mode, conversationId ,userId } = parsed.data;
+    // const userId = req.userId;
     const config = modeConfig[mode];
 
     // ── 1. Conversation check + embedding in parallel ─────────────────────────

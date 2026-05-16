@@ -32,8 +32,8 @@ app.get("/ready", async (_req, res) => {
         return res.status(503).json({ error: "Backend service Not Ready" });
     }
 });
-app.use('/admin', adminMiddleware, admin);
-app.use('/user',user);
+// app.use('/admin', adminMiddleware, admin);
+// app.use('/user',user);
 app.use(chat);
 
 const PORT = process.env.PORT || '3001';
