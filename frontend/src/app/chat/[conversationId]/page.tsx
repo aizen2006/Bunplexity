@@ -7,8 +7,8 @@ import ConversationSidebar from '@/components/ConversationSidebar';
 import MessageList from '@/components/MessageList';
 import ChatBar from '@/components/ChatBar';
 import SourcesTab, { collectUniqueSources } from '@/components/SourcesTab';
-import { supabase } from '@/lib/supabase';
 import { fetchConversation, streamChat, AuthError } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import type { ChatModel, ChatOptions, Message, Source } from '@/types';
 import { DEFAULT_CHAT_OPTIONS } from '@/types';
 
@@ -20,18 +20,19 @@ function ChatContent({ conversationId }: { conversationId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const auth = useAuth();
+  const authReady = auth.status === 'authenticated';
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingText, setStreamingText] = useState('');
   const [sources, setSources] = useState<Source[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [title, setTitle] = useState('');
-  const [authReady, setAuthReady] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'chat' | 'sources'>('chat');
 
   const [chatOptions, setChatOptions] = useState<ChatOptions>(DEFAULT_CHAT_OPTIONS);
 
-  const tokenRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const startedRef = useRef(false);
   const streamingRef = useRef(false);
@@ -59,39 +60,41 @@ function ChatContent({ conversationId }: { conversationId: string }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auth check
+  // Redirect when unauthenticated; preserve intended destination in ?next
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        router.push('/login');
-        return;
-      }
-      tokenRef.current = session.access_token;
-      setAuthReady(true);
-    });
-  }, [router]);
+    if (auth.status !== 'unauthenticated') return;
+    const next = encodeURIComponent(window.location.pathname + window.location.search);
+    router.push(`/login?next=${next}`);
+  }, [auth.status, router]);
 
   // Load existing conversation history
   useEffect(() => {
-    if (!authReady || conversationId === 'new') return;
+    if (!authReady || !auth.token || conversationId === 'new') return;
     (async () => {
       try {
-        const conv = await fetchConversation(tokenRef.current!, conversationId);
+        const conv = await fetchConversation(auth.token!, conversationId);
         setTitle(conv.title ?? '');
         setMessages(conv.messages ?? []);
       } catch {
         /* new or not found — start fresh */
       }
     })();
-  }, [authReady, conversationId]);
+  }, [authReady, auth.token, conversationId]);
 
   const sendMessage = useCallback(
     (query: string, options: ChatOptions = chatOptionsRef.current) => {
-      if (!tokenRef.current || streamingRef.current) return;
+      if (!auth.token || streamingRef.current) return;
+
+      // Mint a real UUID before the first send when the URL is /chat/new
+      let resolvedConvId = conversationId;
+      if (resolvedConvId === 'new') {
+        resolvedConvId = crypto.randomUUID();
+        router.replace(`/chat/${resolvedConvId}`);
+      }
 
       const userMsg: Message = {
         id: crypto.randomUUID(),
-        conversationId,
+        conversationId: resolvedConvId,
         content: query,
         role: 'user',
         createdAt: new Date().toISOString(),
@@ -105,15 +108,14 @@ function ChatContent({ conversationId }: { conversationId: string }) {
       streamingRef.current = true;
 
       let accumulatedText = '';
-      let resolvedConvId = conversationId;
       let resolvedSources: Source[] = [];
 
       abortRef.current?.abort();
       const endpoint = messagesRef.current.length > 0 ? '/chat/follow-up' : '/chat';
-      abortRef.current = streamChat(tokenRef.current, query, conversationId, options, {
+      abortRef.current = streamChat(auth.token, query, resolvedConvId, options, {
         onConversationId: id => {
           resolvedConvId = id;
-          if (conversationId !== id) {
+          if (conversationId !== id && conversationId !== 'new') {
             router.replace(`/chat/${id}`);
           }
         },
@@ -152,7 +154,7 @@ function ChatContent({ conversationId }: { conversationId: string }) {
         },
       }, endpoint);
     },
-    [conversationId, router]
+    [auth.token, conversationId, router]
   );
 
   // Auto-start from ?q= param
@@ -233,16 +235,23 @@ function ChatContent({ conversationId }: { conversationId: string }) {
               <SourcesTab messages={messages} liveSources={sources} />
             ) : messages.length === 0 && !streaming ? (
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="flex flex-col items-center justify-center h-48 space-y-2"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: 'easeOut' }}
+                className="flex flex-col items-center justify-center min-h-[55vh] gap-3"
               >
+                <h1
+                  className="text-4xl font-extrabold tracking-tight"
+                  style={{ fontFamily: 'var(--font-heading)' }}
+                >
+                  <span style={{ color: 'var(--accent)' }}>Bun</span>
+                  <span style={{ color: 'var(--fg-primary)' }}>plexity</span>
+                </h1>
                 <p
                   className="text-sm"
                   style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}
                 >
-                  Start a conversation below
+                  Ask anything. Sources included.
                 </p>
               </motion.div>
             ) : (

@@ -1,15 +1,16 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import ChatBar from '@/components/ChatBar';
-import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
 import type { ChatOptions } from '@/types';
 import { DEFAULT_CHAT_OPTIONS } from '@/types';
 
 export default function Home() {
   const router = useRouter();
+  const auth = useAuth();
   const [loading, setLoading] = useState(false);
 
   const [chatOptions, setChatOptions] = useState<ChatOptions>(() => {
@@ -20,9 +21,13 @@ export default function Home() {
     } catch { return DEFAULT_CHAT_OPTIONS; }
   });
 
-  const handleSubmit = async (query: string, options: ChatOptions) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+  // Signed-in users land inside the chat layout
+  useEffect(() => {
+    if (auth.status === 'authenticated') router.replace('/chat/new');
+  }, [auth.status, router]);
+
+  const handleSubmit = (query: string, options: ChatOptions) => {
+    if (auth.status !== 'authenticated') {
       router.push('/login');
       return;
     }

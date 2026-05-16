@@ -23,8 +23,9 @@ async function request<T>(path: string, token: string, options?: RequestInit): P
   return res.json() as Promise<T>;
 }
 
-export function fetchMe(token: string): Promise<User> {
-  return request<User>('/user/me', token);
+export async function fetchMe(token: string): Promise<User> {
+  const res = await request<{ user: User }>('/user/me', token);
+  return res.user;
 }
 
 export function fetchConversations(token: string): Promise<Conversation[]> {
@@ -33,6 +34,21 @@ export function fetchConversations(token: string): Promise<Conversation[]> {
 
 export function fetchConversation(token: string, id: string): Promise<Conversation> {
   return request<Conversation>(`/user/conversations/${id}`, token);
+}
+
+export function deleteConversation(token: string, id: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(`/user/conversation/${id}`, token, { method: 'DELETE' });
+}
+
+export function updateConversationTitle(
+  token: string,
+  conversationId: string,
+  title: string,
+): Promise<{ ok: true; title: string }> {
+  return request<{ ok: true; title: string }>(`/user/conversation`, token, {
+    method: 'PATCH',
+    body: JSON.stringify({ conversationId, title }),
+  });
 }
 
 export interface StreamCallbacks {
@@ -107,6 +123,88 @@ export function streamChat(
               callbacks.onDone();
             } else if (currentEvent === 'error') {
               let msg = 'Stream failed';
+              try { msg = JSON.parse(currentData).error ?? msg; } catch { /* ignore */ }
+              callbacks.onError(new Error(msg));
+            }
+            currentEvent = '';
+            currentData = '';
+          }
+        }
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        callbacks.onError(err as Error);
+      }
+    }
+  })();
+
+  return controller;
+}
+
+export interface TranscribeCallbacks {
+  onDelta: (text: string) => void;
+  onDone:  (finalText: string) => void;
+  onError: (err: Error) => void;
+}
+
+export function transcribeAudio(
+  token: string,
+  blob: Blob,
+  callbacks: TranscribeCallbacks,
+): AbortController {
+  const controller = new AbortController();
+
+  (async () => {
+    try {
+      const response = await fetch(`${API_BASE}/transcript`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': blob.type || 'audio/webm',
+          Authorization: `Bearer ${token}`,
+        },
+        body: blob,
+        signal: controller.signal,
+      });
+
+      if (response.status === 401) throw new AuthError();
+      if (!response.ok) {
+        let msg = `HTTP ${response.status}`;
+        try {
+          const body = await response.json();
+          if (body?.error) msg = body.error;
+        } catch { /* not JSON */ }
+        throw new Error(msg);
+      }
+      if (!response.body) throw new Error('No response body');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let currentEvent = '';
+      let currentData = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith('data: ')) {
+            currentData = line.slice(6);
+          } else if (line === '') {
+            if (currentEvent === 'delta') {
+              try { callbacks.onDelta(JSON.parse(currentData).text); } catch { /* ignore */ }
+            } else if (currentEvent === 'done') {
+              let finalText = '';
+              try { finalText = JSON.parse(currentData).text ?? ''; } catch { /* ignore */ }
+              callbacks.onDone(finalText);
+            } else if (currentEvent === 'error') {
+              let msg = 'Transcription failed';
               try { msg = JSON.parse(currentData).error ?? msg; } catch { /* ignore */ }
               callbacks.onError(new Error(msg));
             }

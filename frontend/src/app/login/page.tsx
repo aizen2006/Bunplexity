@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
 
 function GoogleIcon() {
   return (
@@ -35,15 +37,31 @@ function GitHubIcon() {
   );
 }
 
-export default function Login() {
+function LoginContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const auth = useAuth();
   const [loading, setLoading] = useState<'google' | 'github' | null>(null);
+
+  const nextPath = searchParams.get('next');
+  const safeNext = nextPath && nextPath.startsWith('/') ? nextPath : '/chat/new';
+
+  // Already signed in → bounce to destination
+  useEffect(() => {
+    if (auth.status === 'authenticated') router.replace(safeNext);
+  }, [auth.status, router, safeNext]);
 
   const signIn = async (provider: 'google' | 'github') => {
     setLoading(provider);
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/chat/new` },
+      options: { redirectTo: `${window.location.origin}${safeNext}` },
     });
+    if (error) {
+      console.error('OAuth init failed:', error);
+      setLoading(null);
+    }
+    // On success, the SDK navigates the tab away — loading state is irrelevant.
   };
 
   return (
@@ -136,5 +154,13 @@ export default function Login() {
         </p>
       </motion.div>
     </main>
+  );
+}
+
+export default function Login() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
   );
 }

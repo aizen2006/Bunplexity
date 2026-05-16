@@ -293,4 +293,54 @@ app.post("/chat/follow-up", authMiddleware, chatRateLimit, async (req, res) => {
     }
 });
 
+app.use(
+    express.raw({
+      type: [
+        "audio/mpeg",
+        "audio/mp3",
+        "audio/webm",
+        "audio/wav",
+        "audio/mp4",
+        "audio/x-m4a",
+      ],
+      limit: "25mb",
+    })
+);
+// ── POST /transcript ────────────────────────────────────────────────────────
+app.post("/transcript", authMiddleware, chatRateLimit, async (req, res) => {
+    if (!req.body || !(req.body instanceof Buffer)) {
+        return res.status(400).json({ error: "No audio buffer received" });
+    }
+    const contentType = req.headers["content-type"] ?? "audio/webm";
+    const extension = contentType.split("/")[1]?.split(";")[0] || "webm";
+    const audioFile = new File([req.body], `audio.${extension}`, { type: contentType });
+
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    try {
+        const stream = await openai.audio.transcriptions.create({
+            file: audioFile,
+            model: "gpt-4o-mini-transcribe",
+            response_format: "text",
+            stream: true,
+        });
+        for await (const event of stream) {
+            if (event.type === "transcript.text.delta") {
+                res.write(`event: delta\ndata: ${JSON.stringify({ text: event.delta })}\n\n`);
+            } else if (event.type === "transcript.text.done") {
+                res.write(`event: done\ndata: ${JSON.stringify({ text: event.text })}\n\n`);
+            }
+        }
+    } catch (err) {
+        console.error("Transcribe stream error:", err);
+        res.write(`event: error\ndata: ${JSON.stringify(streamErrorPayload(err))}\n\n`);
+    } finally {
+        res.end();
+    }
+});
+
+
 export { app };

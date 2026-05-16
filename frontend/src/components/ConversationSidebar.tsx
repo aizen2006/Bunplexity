@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase } from '@/lib/supabase';
-import { fetchConversations } from '@/lib/api';
+import { fetchConversations, deleteConversation, updateConversationTitle } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
+import UserMenu from '@/components/UserMenu';
 import type { Conversation } from '@/types';
 
 function relativeTime(iso: string): string {
@@ -20,15 +21,85 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+function PencilIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <path
+        d="M8.5 1.5L10.5 3.5L4 10H2V8L8.5 1.5Z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <path
+        d="M2 3.5H10M4.5 3.5V2.5C4.5 2 4.8 1.5 5.5 1.5H6.5C7.2 1.5 7.5 2 7.5 2.5V3.5M3 3.5L3.5 10.5C3.5 11 3.8 11 4.2 11H7.8C8.2 11 8.5 11 8.5 10.5L9 3.5"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function ConversationItem({
   conv,
   isActive,
   index,
+  onRename,
+  onDelete,
 }: {
   conv: Conversation;
   isActive: boolean;
   index: number;
+  onRename: (id: string, title: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState(conv.title ?? '');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) {
+      setEditValue(conv.title ?? '');
+      // focus + select on next tick once the input has mounted
+      requestAnimationFrame(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      });
+    }
+  }, [editing, conv.title]);
+
+  const commitRename = async () => {
+    const next = editValue.trim();
+    if (!next || next === conv.title || busy) { setEditing(false); return; }
+    setBusy(true);
+    try { await onRename(conv.id, next); }
+    catch (err) { console.error('Rename failed:', err); }
+    finally { setBusy(false); setEditing(false); }
+  };
+
+  const confirmDelete = async () => {
+    if (busy) return;
+    setBusy(true);
+    try { await onDelete(conv.id); }
+    catch (err) { console.error('Delete failed:', err); setBusy(false); setConfirmingDelete(false); }
+    // on success, the parent removes us — no need to reset state
+  };
+
+  const stop = (e: React.MouseEvent | React.SyntheticEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, x: -12 }}
@@ -40,7 +111,8 @@ function ConversationItem({
     >
       <Link
         href={`/chat/${conv.id}`}
-        className="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors duration-100 relative"
+        onClick={e => { if (editing || confirmingDelete) stop(e); }}
+        className="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors duration-100 relative gap-2"
         style={{
           color: isActive ? 'var(--fg-primary)' : 'var(--fg-muted)',
           background: isActive ? 'var(--bg-elevated)' : 'transparent',
@@ -54,13 +126,93 @@ function ConversationItem({
           whileHover={{ scaleY: 1, opacity: 1 }}
           transition={{ duration: 0.15 }}
         />
-        <span className="truncate flex-1 pl-1">{conv.title ?? 'Untitled'}</span>
-        <span
-          className="text-[10px] ml-2 flex-shrink-0 opacity-0 group-hover:opacity-60 transition-opacity duration-150"
-          style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}
-        >
-          {relativeTime(conv.createdAt)}
-        </span>
+
+        {editing ? (
+          <input
+            ref={inputRef}
+            value={editValue}
+            disabled={busy}
+            onChange={e => setEditValue(e.target.value)}
+            onClick={stop}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { stop(e); commitRename(); }
+              else if (e.key === 'Escape') { stop(e); setEditing(false); }
+            }}
+            onBlur={() => setEditing(false)}
+            className="flex-1 pl-1 bg-transparent outline-none text-sm rounded px-1"
+            style={{
+              color: 'var(--fg-primary)',
+              border: '1px solid var(--accent)',
+              background: 'var(--bg-base)',
+            }}
+          />
+        ) : (
+          <span className="truncate flex-1 pl-1">{conv.title ?? 'Untitled'}</span>
+        )}
+
+        {/* Right cluster */}
+        {confirmingDelete ? (
+          <div className="flex items-center gap-1 flex-shrink-0" onClick={stop}>
+            <span className="text-[10px]" style={{ color: '#f87171', fontFamily: 'var(--font-mono)' }}>
+              Delete?
+            </span>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={e => { stop(e); confirmDelete(); }}
+              aria-label="Confirm delete"
+              className="p-1 rounded"
+              style={{ color: '#f87171' }}
+            >
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                <path d="M2 5.5L4.5 8L9 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={e => { stop(e); setConfirmingDelete(false); }}
+              aria-label="Cancel"
+              className="p-1 rounded"
+              style={{ color: 'var(--fg-muted)' }}
+            >
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                <path d="M2 2L9 9M9 2L2 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+        ) : editing ? null : (
+          <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+            <button
+              type="button"
+              onClick={e => { stop(e); setEditing(true); }}
+              aria-label="Rename"
+              className="p-1 rounded transition-colors"
+              style={{ color: 'var(--fg-muted)' }}
+              onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--accent)')}
+              onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--fg-muted)')}
+            >
+              <PencilIcon />
+            </button>
+            <button
+              type="button"
+              onClick={e => { stop(e); setConfirmingDelete(true); }}
+              aria-label="Delete"
+              className="p-1 rounded transition-colors"
+              style={{ color: 'var(--fg-muted)' }}
+              onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.color = '#f87171')}
+              onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--fg-muted)')}
+            >
+              <TrashIcon />
+            </button>
+            <span
+              className="text-[10px] ml-1"
+              style={{ color: 'var(--fg-subtle)', fontFamily: 'var(--font-mono)' }}
+            >
+              {relativeTime(conv.createdAt)}
+            </span>
+          </div>
+        )}
       </Link>
     </motion.div>
   );
@@ -73,6 +225,8 @@ function HistoryTab({
   setSearchQuery,
   searchVisible,
   setSearchVisible,
+  onRename,
+  onDelete,
 }: {
   conversations: Conversation[];
   activeConversationId?: string;
@@ -80,6 +234,8 @@ function HistoryTab({
   setSearchQuery: (q: string) => void;
   searchVisible: boolean;
   setSearchVisible: (v: boolean | ((prev: boolean) => boolean)) => void;
+  onRename: (id: string, title: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
   const filtered = useMemo(
     () =>
@@ -165,6 +321,8 @@ function HistoryTab({
                 conv={conv}
                 isActive={conv.id === activeConversationId}
                 index={i}
+                onRename={onRename}
+                onDelete={onDelete}
               />
             ))
           )}
@@ -259,29 +417,37 @@ interface ConversationSidebarProps {
 }
 
 export default function ConversationSidebar({ activeConversationId }: ConversationSidebarProps) {
+  const router = useRouter();
+  const auth = useAuth();
+  const isLoggedIn = auth.status === 'authenticated';
+
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState<SidebarTab>('history');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchVisible, setSearchVisible] = useState(false);
-  const router = useRouter();
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
-  };
 
   useEffect(() => {
+    if (!auth.token) return;
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      setIsLoggedIn(true);
       try {
-        const convs = await fetchConversations(session.access_token);
+        const convs = await fetchConversations(auth.token!);
         setConversations(convs);
       } catch { /* ignore */ }
     })();
-  }, [activeConversationId]);
+  }, [auth.token, activeConversationId]);
+
+  const handleRename = useCallback(async (id: string, title: string) => {
+    if (!auth.token) return;
+    await updateConversationTitle(auth.token, id, title);
+    setConversations(prev => prev.map(c => (c.id === id ? { ...c, title } : c)));
+  }, [auth.token]);
+
+  const handleDelete = useCallback(async (id: string) => {
+    if (!auth.token) return;
+    await deleteConversation(auth.token, id);
+    setConversations(prev => prev.filter(c => c.id !== id));
+    if (id === activeConversationId) router.push('/chat/new');
+  }, [auth.token, activeConversationId, router]);
 
   const tabs: { id: SidebarTab; label: string }[] = [
     { id: 'history', label: 'History' },
@@ -309,7 +475,7 @@ export default function ConversationSidebar({ activeConversationId }: Conversati
       {/* New chat */}
       <div className="px-4 py-3 flex-shrink-0">
         <button
-          onClick={() => router.push('/')}
+          onClick={() => router.push('/chat/new')}
           className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-opacity duration-150 hover:opacity-90"
           style={{ background: 'var(--accent)', color: 'var(--bg-base)' }}
         >
@@ -357,6 +523,8 @@ export default function ConversationSidebar({ activeConversationId }: Conversati
             setSearchQuery={setSearchQuery}
             searchVisible={searchVisible}
             setSearchVisible={setSearchVisible}
+            onRename={handleRename}
+            onDelete={handleDelete}
           />
         ) : (
           <AgentTab key="agent" />
@@ -364,15 +532,9 @@ export default function ConversationSidebar({ activeConversationId }: Conversati
       </AnimatePresence>
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t flex-shrink-0" style={{ borderColor: 'var(--fg-subtle)' }}>
+      <div className="px-2 py-2 border-t flex-shrink-0" style={{ borderColor: 'var(--fg-subtle)' }}>
         {isLoggedIn ? (
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center py-2 rounded-lg text-xs transition-opacity duration-150 hover:opacity-70"
-            style={{ color: 'var(--fg-subtle)', fontFamily: 'var(--font-mono)' }}
-          >
-            Sign out
-          </button>
+          <UserMenu onSignOut={auth.signOut} />
         ) : (
           <button
             onClick={() => router.push('/login')}

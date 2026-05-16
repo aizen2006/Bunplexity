@@ -2,6 +2,8 @@
 
 import { useState, useRef, useCallback, useEffect, useId } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '@/lib/supabase';
+import { transcribeAudio } from '@/lib/api';
 import type { ChatMode, ChatModel, ChatOptions } from '@/types';
 import { CHAT_MODEL_GROUPS, CHAT_MODELS, DEFAULT_CHAT_OPTIONS } from '@/types';
 
@@ -25,7 +27,7 @@ function ModeToggle({ mode, onChange, pillId }: { mode: ChatMode; onChange: (m: 
           key={m}
           type="button"
           onClick={() => onChange(m)}
-          className="relative z-10 px-3 py-1 text-xs font-medium rounded-full transition-colors duration-150 capitalize"
+          className="relative z-10 px-2.5 py-0.5 text-[11px] font-medium rounded-full transition-colors duration-150 capitalize"
           style={{ color: mode === m ? 'var(--bg-base)' : 'var(--fg-muted)' }}
         >
           {m === 'fast' ? 'Fast' : 'Thinking'}
@@ -63,7 +65,7 @@ function ModelSelector({
       <button
         type="button"
         onClick={onToggle}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all duration-150"
+        className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[11px] transition-all duration-150"
         style={{
           background: open ? 'rgba(0,212,255,0.08)' : 'transparent',
           border: '1px solid',
@@ -138,6 +140,75 @@ function ModelSelector({
   );
 }
 
+function MicIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+      <rect x="5" y="1.5" width="4" height="7" rx="2" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M3 7C3 9.21 4.79 11 7 11C9.21 11 11 9.21 11 7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M7 11V12.5M5 12.5H9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function StopIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor">
+      <rect x="1.5" y="1.5" width="8" height="8" rx="1.5" />
+    </svg>
+  );
+}
+
+function MicButton({
+  recording,
+  busy,
+  onToggle,
+}: { recording: boolean; busy: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={busy && !recording}
+      aria-label={recording ? 'Stop recording' : 'Start recording'}
+      className="relative flex items-center justify-center w-7 h-7 rounded-lg transition-colors disabled:opacity-50"
+      style={{
+        background: recording ? 'rgba(239,68,68,0.15)' : 'transparent',
+        border: '1px solid',
+        borderColor: recording ? '#f87171' : 'var(--fg-subtle)',
+        color: recording ? '#f87171' : 'var(--fg-muted)',
+      }}
+    >
+      {recording ? <StopIcon /> : <MicIcon />}
+      {recording && (
+        <motion.span
+          className="absolute inset-0 rounded-lg pointer-events-none"
+          animate={{ opacity: [0.6, 0, 0.6] }}
+          transition={{ duration: 1.4, repeat: Infinity }}
+          style={{ boxShadow: '0 0 0 2px rgba(239,68,68,0.4)' }}
+        />
+      )}
+    </button>
+  );
+}
+
+function RecordingStatus() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex items-center gap-1.5 text-[10px]"
+      style={{ color: '#f87171', fontFamily: 'var(--font-mono)' }}
+    >
+      <motion.span
+        className="w-1.5 h-1.5 rounded-full"
+        style={{ background: '#f87171' }}
+        animate={{ opacity: [1, 0.3, 1] }}
+        transition={{ duration: 1.2, repeat: Infinity }}
+      />
+      Recording…
+    </div>
+  );
+}
+
 export default function ChatBar({
   onSubmit,
   loading = false,
@@ -151,8 +222,72 @@ export default function ChatBar({
   const [mode, setMode] = useState<ChatMode>(defaultOptions?.mode ?? DEFAULT_CHAT_OPTIONS.mode);
   const [model, setModel] = useState<ChatModel>(defaultOptions?.model ?? DEFAULT_CHAT_OPTIONS.model);
   const [modelOpen, setModelOpen] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const transcribeAbortRef = useRef<AbortController | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
   const pillId = useId();
+
+  const startRecording = useCallback(async () => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      console.warn('Microphone capture not supported in this browser');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType =
+        typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : 'audio/mp4';
+      const mr = new MediaRecorder(stream, { mimeType });
+      chunksRef.current = [];
+
+      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+
+      mr.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        chunksRef.current = [];
+        if (blob.size === 0) return;
+
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (!token) return;
+
+        setTranscribing(true);
+        transcribeAbortRef.current = transcribeAudio(token, blob, {
+          onDelta: text => setValue(v => v + text),
+          onDone:  () => setTranscribing(false),
+          onError: err => {
+            console.error('Transcription error:', err);
+            setTranscribing(false);
+          },
+        });
+      };
+
+      mediaRecorderRef.current = mr;
+      mr.start();
+      setRecording(true);
+    } catch (err) {
+      console.error('Mic permission denied or unavailable:', err);
+    }
+  }, []);
+
+  const stopRecording = useCallback(() => {
+    mediaRecorderRef.current?.stop();
+    mediaRecorderRef.current = null;
+    setRecording(false);
+  }, []);
+
+  const onMicToggle = recording ? stopRecording : startRecording;
+
+  // Cleanup on unmount
+  useEffect(() => () => {
+    mediaRecorderRef.current?.stop();
+    transcribeAbortRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     const ta = textareaRef.current;
@@ -176,6 +311,10 @@ export default function ChatBar({
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();
     if (!trimmed || loading) return;
+    // Abort any in-flight transcription so its deltas don't pollute the next message
+    transcribeAbortRef.current?.abort();
+    transcribeAbortRef.current = null;
+    setTranscribing(false);
     onSubmit(trimmed, { mode, model });
     setValue('');
   }, [value, loading, onSubmit, mode, model]);
@@ -199,7 +338,7 @@ export default function ChatBar({
       className="relative w-full"
     >
       <div
-        className="flex flex-col gap-2 rounded-xl px-4 pt-3 pb-2 transition-all duration-200"
+        className="flex flex-col gap-2 rounded-xl px-3.5 pt-2.5 pb-1.5 transition-all duration-200"
         style={{
           background: 'var(--bg-elevated)',
           border: focused ? '1px solid var(--accent)' : '1px solid var(--fg-subtle)',
@@ -227,8 +366,9 @@ export default function ChatBar({
           }}
         />
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2" onMouseDown={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0" onMouseDown={e => e.stopPropagation()}>
+            {recording && <RecordingStatus />}
             <ModeToggle mode={mode} onChange={setMode} pillId={pillId} />
             <ModelSelector
               model={model}
@@ -236,6 +376,7 @@ export default function ChatBar({
               onToggle={() => setModelOpen(v => !v)}
               onChange={setModel}
             />
+            <MicButton recording={recording} busy={transcribing} onToggle={onMicToggle} />
           </div>
 
           <button
