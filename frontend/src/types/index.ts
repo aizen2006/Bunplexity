@@ -3,14 +3,8 @@ export type Role = 'user' | 'assistant';
 export type ChatMode = 'fast' | 'thinking';
 export type ChatModel =
   | 'gpt-5.5'
-  | 'gpt-5.5-pro'
   | 'gpt-5.4'
-  | 'gpt-5.4-pro'
-  | 'gpt-5.4-mini'
-  | 'gpt-5.4-nano'
-  | 'gpt-5'
-  | 'gpt-5-mini'
-  | 'gpt-5-nano';
+  | 'gpt-5.4-mini';
 
 export interface ChatOptions {
   mode: ChatMode;
@@ -19,7 +13,7 @@ export interface ChatOptions {
 
 export const DEFAULT_CHAT_OPTIONS: ChatOptions = {
   mode: 'fast',
-  model: 'gpt-5-mini',
+  model: 'gpt-5.4-mini',
 };
 
 export interface ChatModelEntry {
@@ -35,27 +29,11 @@ export interface ChatModelGroup {
 
 export const CHAT_MODEL_GROUPS: ChatModelGroup[] = [
   {
-    group: 'GPT-5.5',
-    models: [
-      { value: 'gpt-5.5',     label: 'GPT-5.5',     description: 'New class of intelligence' },
-      { value: 'gpt-5.5-pro', label: 'GPT-5.5 Pro', description: 'Smarter & more precise' },
-    ],
-  },
-  {
-    group: 'GPT-5.4',
-    models: [
-      { value: 'gpt-5.4',      label: 'GPT-5.4',      description: 'Affordable coding & professional work' },
-      { value: 'gpt-5.4-pro',  label: 'GPT-5.4 Pro',  description: 'Smarter GPT-5.4-class responses' },
-      { value: 'gpt-5.4-mini', label: 'GPT-5.4 mini', description: 'Strongest mini for coding & agents' },
-      { value: 'gpt-5.4-nano', label: 'GPT-5.4 nano', description: 'Cheapest GPT-5.4-class model' },
-    ],
-  },
-  {
     group: 'GPT-5',
     models: [
-      { value: 'gpt-5',      label: 'GPT-5',      description: 'Intelligent reasoning, configurable effort' },
-      { value: 'gpt-5-mini', label: 'GPT-5 mini', description: 'Cost-sensitive, low latency' },
-      { value: 'gpt-5-nano', label: 'GPT-5 nano', description: 'Fastest, most cost-efficient' },
+      { value: 'gpt-5.5',      label: 'GPT-5.5',      description: 'New class of intelligence for coding & professional work' },
+      { value: 'gpt-5.4',      label: 'GPT-5.4',      description: 'Affordable model for coding & professional work' },
+      { value: 'gpt-5.4-mini', label: 'GPT-5.4 Mini',  description: 'Strongest mini for coding, computer use & subagents' },
     ],
   },
 ];

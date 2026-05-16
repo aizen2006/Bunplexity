@@ -45,10 +45,7 @@ function ChatContent({ conversationId }: { conversationId: string }) {
   useEffect(() => {
     const modeParam = searchParams.get('mode');
     const modelParam = searchParams.get('model');
-    const validModels: ChatModel[] = [
-      'gpt-5.5', 'gpt-5.5-pro', 'gpt-5.4', 'gpt-5.4-pro',
-      'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5', 'gpt-5-mini', 'gpt-5-nano',
-    ];
+    const validModels: ChatModel[] = ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini'];
     const seeded: ChatOptions = {
       mode: modeParam === 'thinking' ? 'thinking' : 'fast',
       model: validModels.includes(modelParam as ChatModel)

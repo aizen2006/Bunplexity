@@ -13,10 +13,7 @@ import { invalidateCache } from "../lib/cache";
 const app = express.Router();
 
 const ALLOWED_MODELS = [
-    'gpt-5.5', 'gpt-5.5-pro',
-    'gpt-5.4', 'gpt-5.4-pro', 'gpt-5.4-mini', 'gpt-5.4-nano',
-    'gpt-5', 'gpt-5-mini', 'gpt-5-nano',
-    'gpt-4o', 'gpt-4o-mini',
+    'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini',
 ] as const;
 
 const chatSchema = z.object({
@@ -68,7 +65,7 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
         // ── 2. Create conversation before inserting message ───────────────────
         if (!existing) {
             const titleRes = await openai.responses.create({
-                model: "gpt-4o-mini",
+                model: "gpt-5.4-mini",
                 input: `Generate a concise title (5 words or fewer) for this query: ${query}`,
             });
             await db.insert(conversations).values({
@@ -130,11 +127,9 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
         res.write(`event: conversation\ndata: ${JSON.stringify({ conversationId })}\n\n`);
 
         for await (const event of output) {
-            if (event.type === 'response.output_text.delta') {
-                const delta = event.delta;
-                assistantMessage += delta;
-                res.write(delta);
-            }
+            assistantMessage += event;
+            res.write(event);
+            
         }
 
         const sources = webSearchResult.map((r: any) => ({ url: r.url, title: r.title }));
@@ -249,11 +244,8 @@ app.post("/chat/follow-up", authMiddleware, chatRateLimit, async (req, res) => {
         res.write(`event: conversation\ndata: ${JSON.stringify({ conversationId })}\n\n`);
 
         for await (const event of output) {
-            if (event.type === 'response.output_text.delta') {
-                const delta = event.delta;
-                assistantMessage += delta;
-                res.write(delta);
-            }
+            assistantMessage += event;
+            res.write(event);
         }
 
         const sources = webSearchResult.map((r: any) => ({ url: r.url, title: r.title }));
