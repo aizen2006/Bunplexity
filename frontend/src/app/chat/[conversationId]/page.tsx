@@ -146,7 +146,7 @@ function ChatContent({ conversationId }: { conversationId: string }) {
             router.push('/login');
             return;
           }
-          setStreamError('Something went wrong. Please try again.');
+          setStreamError(err.message || 'Something went wrong. Please try again.');
         },
       }, endpoint);
     },

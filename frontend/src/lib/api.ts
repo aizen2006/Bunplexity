@@ -66,7 +66,14 @@ export function streamChat(
       });
 
       if (response.status === 401) throw new AuthError();
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        let msg = `HTTP ${response.status}`;
+        try {
+          const body = await response.json();
+          if (body?.error) msg = body.error;
+        } catch { /* body not JSON — keep generic message */ }
+        throw new Error(msg);
+      }
       if (!response.body) throw new Error('No response body');
 
       const reader = response.body.getReader();

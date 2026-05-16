@@ -6,8 +6,7 @@ export const pc = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!
 });
 
-const indexName = 'quickstart';
-const index = pc.index(indexName);
+const index = pc.index({name:process.env.PINECONE_INDEX});
 
 async function getEmbedding(text: string): Promise<number[]> {
     const res = await openai.embeddings.create({
