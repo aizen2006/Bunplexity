@@ -22,6 +22,13 @@
       "when": 1778329098502,
       "tag": "0002_peaceful_mother_askani",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778913230465,
+      "tag": "0003_fresh_natasha_romanoff",
+      "breakpoints": true
     }
   ]
 }

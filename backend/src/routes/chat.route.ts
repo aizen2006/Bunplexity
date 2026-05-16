@@ -104,12 +104,14 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
         // ── 4. Resolve web search results ─────────────────────────────────────
         if (cacheResult) {
             webSearchResult = cacheResult;
+            console.log(`[chat] cache hit, ${cacheResult.length} sources`);
         } else {
             const webSearchResponse = await tavilyClient.search(query, {
                 searchDepth: config.searchDepth,
                 maxResults: config.maxResults,
             });
             webSearchResult = webSearchResponse.results ?? [];
+            console.log(`[chat] tavily returned ${webSearchResult.length} results`);
             storeInCache(embeddings, webSearchResponse).catch(err =>
                 console.error("Cache write failed:", err)
             );
@@ -138,6 +140,7 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
     res.flushHeaders();
 
     let assistantMessage = "";
+    const sources = webSearchResult.map((r: any) => ({ url: r.url, title: r.title }));
 
     try {
         res.write(`event: conversation\ndata: ${JSON.stringify({ conversationId })}\n\n`);
@@ -151,7 +154,6 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
             }
         }
 
-        const sources = webSearchResult.map((r: any) => ({ url: r.url, title: r.title }));
         res.write(`event: sources\ndata: ${JSON.stringify(sources)}\n\n`);
         res.write(`event: done\ndata: {}\n\n`);
     } catch (err) {
@@ -164,7 +166,7 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
     // ── 7. Persist whatever assistant text we produced (even on partial error)
     if (assistantMessage) {
         db.insert(messages)
-            .values({ conversationId, content: assistantMessage, role: "assistant" })
+            .values({ conversationId, content: assistantMessage, role: "assistant", sources })
             .then(() => Promise.all([
                 invalidateCache(`conversations:${conversationId}`),
                 invalidateCache(`messages:${conversationId}`),
@@ -256,6 +258,7 @@ app.post("/chat/follow-up", authMiddleware, chatRateLimit, async (req, res) => {
     res.flushHeaders();
 
     let assistantMessage = "";
+    const sources = webSearchResult.map((r: any) => ({ url: r.url, title: r.title }));
 
     try {
         res.write(`event: conversation\ndata: ${JSON.stringify({ conversationId })}\n\n`);
@@ -269,7 +272,6 @@ app.post("/chat/follow-up", authMiddleware, chatRateLimit, async (req, res) => {
             }
         }
 
-        const sources = webSearchResult.map((r: any) => ({ url: r.url, title: r.title }));
         res.write(`event: sources\ndata: ${JSON.stringify(sources)}\n\n`);
         res.write(`event: done\ndata: {}\n\n`);
     } catch (err) {
@@ -282,7 +284,7 @@ app.post("/chat/follow-up", authMiddleware, chatRateLimit, async (req, res) => {
     // ── 7. Persist whatever assistant text we produced (even on partial error)
     if (assistantMessage) {
         db.insert(messages)
-            .values({ conversationId, content: assistantMessage, role: "assistant" })
+            .values({ conversationId, content: assistantMessage, role: "assistant", sources })
             .then(() => Promise.all([
                 invalidateCache(`conversations:${conversationId}`),
                 invalidateCache(`messages:${conversationId}`),

@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import ConversationSidebar from '@/components/ConversationSidebar';
 import MessageList from '@/components/MessageList';
 import ChatBar from '@/components/ChatBar';
+import SourcesTab, { collectUniqueSources } from '@/components/SourcesTab';
 import { supabase } from '@/lib/supabase';
 import { fetchConversation, streamChat, AuthError } from '@/lib/api';
 import type { ChatModel, ChatOptions, Message, Source } from '@/types';
@@ -26,6 +27,7 @@ function ChatContent({ conversationId }: { conversationId: string }) {
   const [title, setTitle] = useState('');
   const [authReady, setAuthReady] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'chat' | 'sources'>('chat');
 
   const [chatOptions, setChatOptions] = useState<ChatOptions>(DEFAULT_CHAT_OPTIONS);
 
@@ -171,7 +173,7 @@ function ChatContent({ conversationId }: { conversationId: string }) {
       <div className="flex flex-col flex-1 min-w-0">
         {/* Header */}
         <header
-          className="flex items-center px-6 py-3 border-b flex-shrink-0"
+          className="flex items-center justify-between px-6 py-3 border-b flex-shrink-0"
           style={{ borderColor: 'var(--fg-subtle)', background: 'var(--bg-base)' }}
         >
           <motion.h2
@@ -183,12 +185,53 @@ function ChatContent({ conversationId }: { conversationId: string }) {
           >
             {title || 'New Conversation'}
           </motion.h2>
+
+          {/* Tabs */}
+          <div
+            className="flex items-center gap-1 rounded-lg p-1"
+            style={{ background: 'var(--bg-elevated)', border: '1px solid var(--fg-subtle)' }}
+          >
+            {(['chat', 'sources'] as const).map(tab => {
+              const isActive = activeTab === tab;
+              const label = tab === 'chat' ? 'Chat' : 'Sources';
+              const count = tab === 'sources'
+                ? collectUniqueSources(messages, sources).length
+                : null;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className="px-3 py-1 rounded-md text-xs font-medium transition-colors"
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    background: isActive ? 'var(--bg-base)' : 'transparent',
+                    color: isActive ? 'var(--accent)' : 'var(--fg-muted)',
+                  }}
+                >
+                  {label}
+                  {count !== null && count > 0 && (
+                    <span
+                      className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px]"
+                      style={{
+                        background: isActive ? 'var(--bg-elevated)' : 'var(--bg-surface)',
+                        color: isActive ? 'var(--accent)' : 'var(--fg-muted)',
+                      }}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </header>
 
-        {/* Messages */}
+        {/* Main pane */}
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-3xl mx-auto px-6">
-            {messages.length === 0 && !streaming ? (
+            {activeTab === 'sources' ? (
+              <SourcesTab messages={messages} liveSources={sources} />
+            ) : messages.length === 0 && !streaming ? (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}

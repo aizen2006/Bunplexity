@@ -1,5 +1,7 @@
-import { pgTable, text, uuid, timestamp, pgEnum, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, pgEnum, integer, jsonb } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+
+export type Source = { url: string; title: string };
 
 export const providerEnum = pgEnum("provider", ["google", "github", "email"]);
 export const roleEnum = pgEnum("role", ["user", "assistant"]);
@@ -25,6 +27,7 @@ export const messages = pgTable("messages", {
   conversationId: uuid("conversation_id").notNull().references(() => conversations.id),
   content: text("content").notNull(),
   role: roleEnum("role").notNull().default("user"),
+  sources: jsonb("sources").$type<Source[]>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
