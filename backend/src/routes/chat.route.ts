@@ -127,9 +127,14 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
         res.write(`event: conversation\ndata: ${JSON.stringify({ conversationId })}\n\n`);
 
         for await (const event of output) {
-            assistantMessage += event;
-            res.write(event);
-            
+            if (event.type === "response.output_text.delta") {
+                assistantMessage += event.delta;
+                res.write(event.delta);
+            } else if (event.type === "response.failed") {
+                throw new Error(event.response?.error?.message ?? "OpenAI response failed");
+            } else if (event.type === "response.incomplete") {
+                throw new Error("OpenAI response incomplete");
+            }
         }
 
         const sources = webSearchResult.map((r: any) => ({ url: r.url, title: r.title }));
@@ -244,8 +249,14 @@ app.post("/chat/follow-up", authMiddleware, chatRateLimit, async (req, res) => {
         res.write(`event: conversation\ndata: ${JSON.stringify({ conversationId })}\n\n`);
 
         for await (const event of output) {
-            assistantMessage += event;
-            res.write(event);
+            if (event.type === "response.output_text.delta") {
+                assistantMessage += event.delta;
+                res.write(event.delta);
+            } else if (event.type === "response.failed") {
+                throw new Error(event.response?.error?.message ?? "OpenAI response failed");
+            } else if (event.type === "response.incomplete") {
+                throw new Error("OpenAI response incomplete");
+            }
         }
 
         const sources = webSearchResult.map((r: any) => ({ url: r.url, title: r.title }));
