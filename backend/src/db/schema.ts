@@ -52,6 +52,14 @@ export const images = pgTable("images", {
 
 export const usersRelations = relations(users, ({ many }) => ({
   conversations: many(conversations),
+  images: many(images),
+}));
+
+export const imagesRelations = relations(images, ({ one }) => ({
+  user: one(users, {
+    fields: [images.userId],
+    references: [users.id],
+  }),
 }));
 
 export const conversationsRelations = relations(conversations, ({ one, many }) => ({

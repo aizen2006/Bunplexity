@@ -17,9 +17,9 @@ app.post('/upload',authMiddleware,uploadMiddleware.array('docs',5),async(req,res
         });
     }
     let file_content:string="";
-    files.map(async(file)=>{
-        file_content+=(await processFile(file.buffer,file.originalname,file.mimetype)).text
-    })
+    for (const file of files) {
+        file_content += (await processFile(file.buffer, file.originalname, file.mimetype)).text;
+    }
     res.status(200).json({
         message:"The files parsed Successfully",
         statusCode:200,

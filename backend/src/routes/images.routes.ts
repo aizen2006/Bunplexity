@@ -1,4 +1,5 @@
 import { Router } from "express"
+import type { Response } from "express";
 import z from "zod";
 import { authMiddleware } from "../middleware";
 import { openai } from "../lib/openai";
@@ -6,8 +7,9 @@ import { imageUploadMiddleware } from "../middleware";
 import { toFile } from "openai";
 import { db } from "../db";
 import { images } from "../db/schema";
-import uploadImage from "../lib/fileUpload";
-import { eq } from "drizzle-orm";
+import uploadImage, { getImagePublicUrl } from "../lib/fileUpload";
+import { and, desc, eq, gt } from "drizzle-orm";
+import { log } from "../lib/logger";
 
 const app = Router();
 
@@ -30,7 +32,6 @@ const imageStyles = [
 ];
 
 const imageGenSchema = z.object({
-    userId:z.uuid(),
     query:z.string(),
     size:z.enum(['auto'
         ,'1024x1024'
@@ -42,16 +43,8 @@ const imageGenSchema = z.object({
     output_format:z.enum(['png' , 'jpeg' , 'webp']).default('jpeg')
 });
 
-
-app.post('/generate',authMiddleware,async(req,res) => {
-    const parsedData = imageGenSchema.parse(req.body);
-    if(!parsedData.query) return res.status(400).json({
-        message:"Error while reciving the query",
-        statusCode:400
-    });
-    const {userId, query , model , style , size , quality , output_format}= parsedData;
-
-    const prompt = `
+function buildPrompt(query: string, style: string) {
+    return `
             You are an expert image generation assistant.
 
             Your task is to create a high-quality image that accurately reflects the user's intent.
@@ -70,7 +63,71 @@ app.post('/generate',authMiddleware,async(req,res) => {
 
             Requested Style:
             ${style}
-        `
+        `;
+}
+
+interface ImageMeta {
+    userId: string;
+    prompt: string;
+    style: string;
+    size: string;
+    model: string;
+    type: "generate" | "edit";
+}
+
+/**
+ * Upload the final base64 image to the bucket, persist a row, and announce a
+ * durable URL over SSE. Errors are reported as an SSE frame — the response has
+ * already been flushed, so we must NOT call res.status()/res.json() here.
+ */
+async function persistAndAnnounce(res: Response, base64: string, meta: ImageMeta) {
+    try {
+        const result = await uploadImage(Buffer.from(base64, "base64"));
+        if (!result.uploadStatus || !result.data?.path) {
+            log("error", "Image upload to bucket failed", result.error);
+            res.write(`data: ${JSON.stringify({ type: "error", message: "Failed to save image" })}\n\n`);
+            return;
+        }
+
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        const [row] = await db
+            .insert(images)
+            .values({
+                userId: meta.userId,
+                prompt: meta.prompt,
+                style: meta.style,
+                size: meta.size,
+                model: meta.model,
+                type: meta.type,
+                storagePath: result.data.path,
+                expiresAt,
+            })
+            .returning({ id: images.id, createdAt: images.createdAt });
+
+        res.write(
+            `data: ${JSON.stringify({
+                type: "saved",
+                id: row.id,
+                url: getImagePublicUrl(result.data.path),
+                createdAt: row.createdAt,
+                expiresAt: expiresAt.toISOString(),
+            })}\n\n`
+        );
+    } catch (err) {
+        log("error", "Failed to persist generated image", err);
+        res.write(`data: ${JSON.stringify({ type: "error", message: "Failed to save image" })}\n\n`);
+    }
+}
+
+app.post('/generate',authMiddleware,async(req,res) => {
+    const parsedData = imageGenSchema.parse(req.body);
+    if(!parsedData.query) return res.status(400).json({
+        message:"Error while reciving the query",
+        statusCode:400
+    });
+    const { query , model , style , size , quality , output_format}= parsedData;
+
+    const prompt = buildPrompt(query, style);
 
     const stream = await openai.images.generate({
         model:model,
@@ -86,11 +143,14 @@ app.post('/generate',authMiddleware,async(req,res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders();
+
     // Image streaming logic
+    let latestB64: string | undefined;
     try {
         for await (const event of stream) {
             if (event.type === "image_generation.partial_image") {
-                    res.write(
+                latestB64 = event.b64_json;
+                res.write(
                     `data: ${JSON.stringify({
                     type: "partial",
                     index: event.partial_image_index,
@@ -99,49 +159,19 @@ app.post('/generate',authMiddleware,async(req,res) => {
                 );
             }
             if (event.type === "image_generation.completed") {
-                res.write(
-                    `data: ${JSON.stringify({
-                    type: "completed",
-                    })}\n\n`
-                );
-                // database logic
-                try {
-                    const file = Buffer.from(event.b64_json, "base64");
-                    const data = await uploadImage(file);
-
-                    if(!data.data?.fullPath) return res.status(500).json({
-                        message:' Failed to Upload the image to the storage bucket '
+                if ((event as any).b64_json) latestB64 = (event as any).b64_json;
+                res.write(`data: ${JSON.stringify({ type: "completed" })}\n\n`);
+                if (latestB64) {
+                    await persistAndAnnounce(res, latestB64, {
+                        userId: req.userId, prompt: query, style, size, model, type: "generate",
                     });
-
-                    await db.insert(images).values({
-                        userId,
-                        size,
-                        model,
-                        prompt,
-                        style,
-                        type:'generate',
-                        storagePath:data.data?.fullPath,
-                        expiresAt:new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-                    });
-                } catch (err) {
-                    res.status(500).json({
-                        message:"Error while uploading Data storage bucket",
-                        statusCode:500,
-                        Error:err
-                    })
                 }
-
             }
         }
         res.end();
     } catch (err) {
-        res.write(
-            `data: ${JSON.stringify({
-            type: "error",
-            message: "Generation failed",
-            })}\n\n`
-        );
-
+        log("error", "Image generation stream error", err);
+        res.write(`data: ${JSON.stringify({ type: "error", message: "Generation failed" })}\n\n`);
         res.end();
     }
 })
@@ -153,7 +183,7 @@ app.post('/edit',authMiddleware,imageUploadMiddleware.array('images'),async(req,
         message:"Error while reciving the query",
         statusCode:400
     });
-    const { userId ,query , model , style , size , quality , output_format}= parsedData;
+    const { query , model , style , size , quality , output_format}= parsedData;
 
     const files = req.files as Express.Multer.File[];
 
@@ -162,26 +192,7 @@ app.post('/edit',authMiddleware,imageUploadMiddleware.array('images'),async(req,
         statusCode:400
     })
 
-    const prompt = `
-            You are an expert image generation assistant.
-
-            Your task is to create a high-quality image that accurately reflects the user's intent.
-
-            Instructions:
-            - Carefully understand the user's request and preserve its meaning.
-            - Prioritize the main subject, context, and important details mentioned by the user.
-            - Apply the requested visual style consistently.
-            - Produce a visually appealing composition with realistic proportions, lighting, colors, and perspective when appropriate.
-            - Add reasonable details only when they enhance the image without changing the user's intent.
-            - Do not include unrelated objects, text, watermarks, logos, or artifacts unless explicitly requested.
-            - If the request is ambiguous, make sensible creative decisions while staying faithful to the user's description.
-
-            User Request:
-            ${query}
-
-            Requested Style:
-            ${style}
-        `
+    const prompt = buildPrompt(query, style);
 
     const images_arr = await Promise.all(
         files.map((file) =>
@@ -201,16 +212,18 @@ app.post('/edit',authMiddleware,imageUploadMiddleware.array('images'),async(req,
         output_format:output_format,
         stream:true,
     })
-    // SSE headers 
+    // SSE headers
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders();
 
     // Image streaming logic
+    let latestB64: string | undefined;
     try {
         for await (const event of stream) {
             if (event.type === "image_edit.partial_image") {
+                latestB64 = event.b64_json;
                 res.write(
                     `data: ${JSON.stringify({
                     type: "partial",
@@ -220,68 +233,53 @@ app.post('/edit',authMiddleware,imageUploadMiddleware.array('images'),async(req,
                 );
             }
             if (event.type === "image_edit.completed") {
-                res.write(
-                    `data: ${JSON.stringify({
-                    type: "completed",
-                    })}\n\n`
-                );
-                try {
-                    const file = Buffer.from(event.b64_json, "base64");
-                    const data = await uploadImage(file);
-
-                    if(!data.data?.fullPath) return res.status(500).json({
-                        message:' Failed to Upload the image to the storage bucket '
+                if ((event as any).b64_json) latestB64 = (event as any).b64_json;
+                res.write(`data: ${JSON.stringify({ type: "completed" })}\n\n`);
+                if (latestB64) {
+                    await persistAndAnnounce(res, latestB64, {
+                        userId: req.userId, prompt: query, style, size, model, type: "edit",
                     });
-
-                    await db.insert(images).values({
-                        userId,
-                        size,
-                        model,
-                        prompt,
-                        style,
-                        type:'generate',
-                        storagePath:data.data?.fullPath,
-                        expiresAt:new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-                    });
-                } catch (err) {
-                    res.status(500).json({
-                        message:"Error while uploading Data storage bucket",
-                        statusCode:500,
-                        Error:err
-                    })
                 }
             }
         }
         res.end();
     } catch (err) {
-        res.write(
-            `data: ${JSON.stringify({
-            type: "error",
-            message: "Generation failed",
-            })}\n\n`
-        );
-
+        log("error", "Image edit stream error", err);
+        res.write(`data: ${JSON.stringify({ type: "error", message: "Generation failed" })}\n\n`);
         res.end();
     }
 
 })
 
+// ── GET /image/history ───────────────────────────────────────────────────────
+// The user's non-expired generated images, newest first, with public URLs.
 app.get('/history',authMiddleware,async(req,res) => {
-    const { userId } = req.body;
-    if(!userId) return res.status(400).json({
-        message:"Please send a status code",
-        statusCode:400
-    })
-
     try {
-        const responses = await db.select().from(images).where(eq(userId,images.userId));
+        const rows = await db
+            .select()
+            .from(images)
+            .where(and(eq(images.userId, req.userId), gt(images.expiresAt, new Date())))
+            .orderBy(desc(images.createdAt));
+
+        const data = rows.map((r) => ({
+            id: r.id,
+            kind: "image" as const,
+            url: getImagePublicUrl(r.storagePath),
+            prompt: r.prompt,
+            style: r.style,
+            model: r.model,
+            type: r.type,
+            createdAt: r.createdAt,
+            expiresAt: r.expiresAt,
+        }));
 
         return res.status(200).json({
             message:"Images fetched successfully",
             statusCode:200,
-            data:responses
+            data,
         })
     } catch (err) {
+        log("error", "Failed to fetch image history", err);
         return res.status(500).json({
             message:"Error while geting the images",
             statusCode:500,
