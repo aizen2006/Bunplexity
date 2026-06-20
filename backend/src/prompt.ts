@@ -36,6 +36,9 @@ export const PROMPT_TEMPLATE =`
     # USER_QUERY 
     {{USER_QUERY}}
 
+    # FILE_CONTENT
+    {{FILE_CONTENT}}
+
 `
 export const FOLLOW_UP_PROMPT_TEMPLATE = `
     ## Web search results
@@ -43,6 +46,9 @@ export const FOLLOW_UP_PROMPT_TEMPLATE = `
 
     # USER_QUERY
     {{USER_QUERY}}
+
+    ## FILE_CONTENT
+    {{FILE_CONTENT}}
 
     # CONVERSATION_HISTORY
     {{CONVERSATION_HISTORY}}

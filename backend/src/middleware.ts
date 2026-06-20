@@ -2,6 +2,47 @@ import type { Request, Response, NextFunction } from "express";
 import { supabase } from "./lib/client";
 import { db } from "./db/index";
 import { users } from "./db/schema";
+import multer from "multer";
+import path from "path"
+
+// file temporary storage 
+const storage = multer.memoryStorage()
+export const uploadMiddleware = multer({ storage: storage ,limits: { fileSize: 10 * 1024 * 1024 , files:5 },fileFilter: (req, file, cb) => {
+    // Optional: Filter file types (e.g., only images)
+    const allowedTypes = /pdf|csv|docx|txt/;
+    const extName = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimeType = allowedTypes.test(file.mimetype);
+
+    if (extName && mimeType) {
+        return cb(null, true);
+    } else {
+        cb(new Error('Only PDF , CSV , DOCX and TXT are allowed!'));
+    }
+    }
+})
+
+//image upload middleware
+export const imageUploadMiddleware = multer({
+    storage,
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB per file
+        files: 5,
+    },
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpg|jpeg|png|webp|gif/;
+        const extName = allowedTypes.test(
+            path.extname(file.originalname).toLowerCase()
+        );
+        const mimeType = file.mimetype.startsWith("image/");
+    
+        if (extName && mimeType) {
+            cb(null, true);
+        } else {
+            cb(new Error("Only JPG, JPEG, PNG, WEBP, and GIF images are allowed!"));
+        }
+    },
+});
+
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 20;

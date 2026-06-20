@@ -1,6 +1,6 @@
 import express from "express";
 import { eq } from "drizzle-orm";
-import { z } from "zod";
+import { file, z } from "zod";
 import { db } from "../db/index";
 import { conversations, messages } from "../db/schema";
 import { openai } from "../lib/openai";
@@ -9,6 +9,7 @@ import { authMiddleware, chatRateLimit } from "../middleware";
 import { PROMPT_TEMPLATE, FOLLOW_UP_PROMPT_TEMPLATE, SYSTEM_PROMPT } from "../prompt";
 import { getEmbedding, storeInCache, findCachedResult } from "../lib/pinecone";
 import { invalidateCache } from "../lib/cache";
+import { log } from "../lib/logger";
 
 const app = express.Router();
 
@@ -19,23 +20,19 @@ const ALLOWED_MODELS = [
 const chatSchema = z.object({
     mode: z.enum(['thinking', 'fast']),
     query: z.string().min(1).max(5000),
+    file_content:z.string().max(30000).optional(),
     model: z.enum(ALLOWED_MODELS),
     conversationId: z.uuid(),
 });
+
+
 
 const modeConfig = {
     fast:     { searchDepth: "basic"    as const, maxResults: 10 },
     thinking: { searchDepth: "advanced" as const, maxResults: 20 },
 } as const;
 
-declare global {
-    namespace Express {
-        interface Request {
-            userId: string;
-            requestId: string;
-        }
-    }
-}
+
 
 function streamErrorPayload(err: unknown): { error: string } {
     if (err instanceof Error) {
@@ -51,10 +48,12 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
         return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
     }
 
-    const { query, model, mode, conversationId } = parsed.data;
+    let { query, model, mode, conversationId , file_content } = parsed.data;
     const userId = req.userId;
     const config = modeConfig[mode];
-
+    if(!file_content){
+        file_content=""
+    }
     let webSearchResult: any[] = [];
     let output: any;
 
@@ -77,7 +76,7 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
                 userId,
             });
             invalidateCache(`conversations:${userId}`).catch(err =>
-                console.error("Cache invalidation failed:", err)
+                log('error', 'Cache invalidation failed', err)
             );
 
             openai.responses.create({
@@ -92,7 +91,7 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
                         .where(eq(conversations.id, conversationId))
                         .then(() => invalidateCache(`conversations:${userId}`));
                 })
-                .catch(err => console.error("Title generation failed:", err));
+                .catch(err => log('error', 'Title generation failed', err));
         }
 
         // ── 3. Insert user message + semantic cache check in parallel ─────────
@@ -104,23 +103,24 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
         // ── 4. Resolve web search results ─────────────────────────────────────
         if (cacheResult) {
             webSearchResult = cacheResult;
-            console.log(`[chat] cache hit, ${cacheResult.length} sources`);
+            log('info', 'cache hit', { count: cacheResult.length });
         } else {
             const webSearchResponse = await tavilyClient.search(query, {
                 searchDepth: config.searchDepth,
                 maxResults: config.maxResults,
             });
             webSearchResult = webSearchResponse.results ?? [];
-            console.log(`[chat] tavily returned ${webSearchResult.length} results`);
+            log('info', 'tavily search complete', { count: webSearchResult.length });
             storeInCache(embeddings, webSearchResponse).catch(err =>
-                console.error("Cache write failed:", err)
+                log('error', 'Cache write failed', err)
             );
         }
 
         // ── 5. Build prompt + create stream ───────────────────────────────────
         const prompt = PROMPT_TEMPLATE
             .replace("{{WEB_SEARCH_RESULTS}}", JSON.stringify(webSearchResult))
-            .replace("{{USER_QUERY}}", query);
+            .replace("{{USER_QUERY}}", query)
+            .replace("{{FILE_CONTENT}}",file_content);
 
         output = await openai.responses.create({
             model,
@@ -129,7 +129,7 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
             stream: true,
         });
     } catch (err) {
-        console.error("Pre-stream error:", err);
+        log('error', 'Pre-stream error', err);
         return res.status(500).json(streamErrorPayload(err));
     }
 
@@ -157,7 +157,7 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
         res.write(`event: sources\ndata: ${JSON.stringify(sources)}\n\n`);
         res.write(`event: done\ndata: {}\n\n`);
     } catch (err) {
-        console.error("Stream error:", err);
+        log('error', 'Stream error', err);
         res.write(`event: error\ndata: ${JSON.stringify(streamErrorPayload(err))}\n\n`);
     } finally {
         res.end();
@@ -171,7 +171,7 @@ app.post("/chat", authMiddleware, chatRateLimit, async (req, res) => {
                 invalidateCache(`conversations:${conversationId}`),
                 invalidateCache(`messages:${conversationId}`),
             ]))
-            .catch(err => console.error("Failed to persist assistant message:", err));
+            .catch(err => log('error', 'Failed to persist assistant message', err));
     }
 });
 
@@ -225,7 +225,7 @@ app.post("/chat/follow-up", authMiddleware, chatRateLimit, async (req, res) => {
             });
             webSearchResult = webSearchResponse.results ?? [];
             storeInCache(embeddings, webSearchResponse).catch(err =>
-                console.error("Cache write failed:", err)
+                log('error', 'Cache write failed', err)
             );
         }
 
@@ -247,7 +247,7 @@ app.post("/chat/follow-up", authMiddleware, chatRateLimit, async (req, res) => {
             stream: true,
         });
     } catch (err) {
-        console.error("Pre-stream error:", err);
+        log('error', 'Pre-stream error', err);
         return res.status(500).json(streamErrorPayload(err));
     }
 
@@ -275,7 +275,7 @@ app.post("/chat/follow-up", authMiddleware, chatRateLimit, async (req, res) => {
         res.write(`event: sources\ndata: ${JSON.stringify(sources)}\n\n`);
         res.write(`event: done\ndata: {}\n\n`);
     } catch (err) {
-        console.error("Stream error:", err);
+        log('error', 'Stream error', err);
         res.write(`event: error\ndata: ${JSON.stringify(streamErrorPayload(err))}\n\n`);
     } finally {
         res.end();
@@ -289,21 +289,21 @@ app.post("/chat/follow-up", authMiddleware, chatRateLimit, async (req, res) => {
                 invalidateCache(`conversations:${conversationId}`),
                 invalidateCache(`messages:${conversationId}`),
             ]))
-            .catch(err => console.error("Failed to persist assistant message:", err));
+            .catch(err => log('error', 'Failed to persist assistant message', err));
     }
 });
 
 app.use(
     express.raw({
-      type: [
-        "audio/mpeg",
-        "audio/mp3",
-        "audio/webm",
-        "audio/wav",
-        "audio/mp4",
-        "audio/x-m4a",
-      ],
-      limit: "25mb",
+        type: [
+            "audio/mpeg",
+            "audio/mp3",
+            "audio/webm",
+            "audio/wav",
+            "audio/mp4",
+            "audio/x-m4a",
+        ],
+        limit: "25mb",
     })
 );
 // ── POST /transcript ────────────────────────────────────────────────────────
@@ -335,12 +335,13 @@ app.post("/transcript", authMiddleware, chatRateLimit, async (req, res) => {
             }
         }
     } catch (err) {
-        console.error("Transcribe stream error:", err);
+        log('error', 'Transcribe stream error', err);
         res.write(`event: error\ndata: ${JSON.stringify(streamErrorPayload(err))}\n\n`);
     } finally {
         res.end();
     }
 });
+
 
 
 export { app };

@@ -3,6 +3,8 @@ import cors from "cors";
 import { app as user } from "./routes/user.route";
 import { app as chat } from "./routes/chat.route";
 import { app as admin } from "./routes/admin.routes";
+import { app as upload } from "./routes/upload.routes";
+import { app as images } from "./routes/images.routes";
 import { adminMiddleware } from "./middleware";
 import { db } from "./db/index";
 import { users} from "./db/schema";
@@ -32,10 +34,15 @@ app.get("/ready", async (_req, res) => {
         return res.status(503).json({ error: "Backend service Not Ready" });
     }
 });
+
+
 app.use('/admin', adminMiddleware, admin);
 app.use('/user',user);
+app.use('/upload',upload);
 app.use(chat);
+app.use('/image',images);
 
+// Global error handler 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     console.error("Unhandled error:", err);
     if (!res.headersSent) {

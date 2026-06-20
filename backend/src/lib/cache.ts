@@ -1,12 +1,13 @@
 import { createClient } from 'redis';
 import 'dotenv/config';
+import { log } from './logger';
 
 const client = createClient({
   url: process.env.REDIS_URL,
 });
 
-client.on('error', (err) => console.error('Redis error:', err));
-client.connect().catch((err) => console.error('Redis connection failed:', err));
+client.on('error', (err) => log('error', 'Redis error', err));
+client.connect().catch((err) => log('error', 'Redis connection failed', err));
 
 const DEFAULT_EXPIRATION = 3600;
 
@@ -24,7 +25,7 @@ export default async function getOrSetCache(
     await client.setEx(key, DEFAULT_EXPIRATION, JSON.stringify(freshData));
     return freshData;
   } catch (err) {
-    console.error('Cache error, falling back to fresh data:', err);
+    log('error', 'Cache error, falling back to fresh data', err);
     return await cb();
   }
 }
@@ -34,7 +35,7 @@ export async function invalidateCache(key: string): Promise<void> {
     if (!client.isReady) return;
     await client.del(key);
   } catch (err) {
-    console.error('Cache invalidation error:', err);
+    log('error', 'Cache invalidation error', err);
   }
 }
 
