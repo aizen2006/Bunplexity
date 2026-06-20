@@ -4,6 +4,10 @@ import { authMiddleware } from "../middleware";
 import { openai } from "../lib/openai";
 import { imageUploadMiddleware } from "../middleware";
 import { toFile } from "openai";
+import { db } from "../db";
+import { images } from "../db/schema";
+import uploadImage from "../lib/fileUpload";
+import { eq } from "drizzle-orm";
 
 const app = Router();
 
@@ -26,6 +30,7 @@ const imageStyles = [
 ];
 
 const imageGenSchema = z.object({
+    userId:z.uuid(),
     query:z.string(),
     size:z.enum(['auto'
         ,'1024x1024'
@@ -35,7 +40,8 @@ const imageGenSchema = z.object({
     model:z.enum(['gpt-image-1','gpt-image-2']).default('gpt-image-1'),
     style:z.enum(imageStyles).default('Realistic'),
     output_format:z.enum(['png' , 'jpeg' , 'webp']).default('jpeg')
-})
+});
+
 
 app.post('/generate',authMiddleware,async(req,res) => {
     const parsedData = imageGenSchema.parse(req.body);
@@ -43,7 +49,7 @@ app.post('/generate',authMiddleware,async(req,res) => {
         message:"Error while reciving the query",
         statusCode:400
     });
-    const { query , model , style , size , quality , output_format}= parsedData;
+    const {userId, query , model , style , size , quality , output_format}= parsedData;
 
     const prompt = `
             You are an expert image generation assistant.
@@ -98,6 +104,33 @@ app.post('/generate',authMiddleware,async(req,res) => {
                     type: "completed",
                     })}\n\n`
                 );
+                // database logic
+                try {
+                    const file = Buffer.from(event.b64_json, "base64");
+                    const data = await uploadImage(file);
+
+                    if(!data.data?.fullPath) return res.status(500).json({
+                        message:' Failed to Upload the image to the storage bucket '
+                    });
+
+                    await db.insert(images).values({
+                        userId,
+                        size,
+                        model,
+                        prompt,
+                        style,
+                        type:'generate',
+                        storagePath:data.data?.fullPath,
+                        expiresAt:new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                    });
+                } catch (err) {
+                    res.status(500).json({
+                        message:"Error while uploading Data storage bucket",
+                        statusCode:500,
+                        Error:err
+                    })
+                }
+
             }
         }
         res.end();
@@ -120,7 +153,7 @@ app.post('/edit',authMiddleware,imageUploadMiddleware.array('images'),async(req,
         message:"Error while reciving the query",
         statusCode:400
     });
-    const { query , model , style , size , quality , output_format}= parsedData;
+    const { userId ,query , model , style , size , quality , output_format}= parsedData;
 
     const files = req.files as Express.Multer.File[];
 
@@ -150,7 +183,7 @@ app.post('/edit',authMiddleware,imageUploadMiddleware.array('images'),async(req,
             ${style}
         `
 
-    const images = await Promise.all(
+    const images_arr = await Promise.all(
         files.map((file) =>
             toFile(file.buffer, file.originalname, {
                 type: file.mimetype,
@@ -163,7 +196,7 @@ app.post('/edit',authMiddleware,imageUploadMiddleware.array('images'),async(req,
         model:model,
         prompt:prompt,
         size:size,
-        image:images,
+        image:images_arr,
         quality:quality,
         output_format:output_format,
         stream:true,
@@ -192,6 +225,31 @@ app.post('/edit',authMiddleware,imageUploadMiddleware.array('images'),async(req,
                     type: "completed",
                     })}\n\n`
                 );
+                try {
+                    const file = Buffer.from(event.b64_json, "base64");
+                    const data = await uploadImage(file);
+
+                    if(!data.data?.fullPath) return res.status(500).json({
+                        message:' Failed to Upload the image to the storage bucket '
+                    });
+
+                    await db.insert(images).values({
+                        userId,
+                        size,
+                        model,
+                        prompt,
+                        style,
+                        type:'generate',
+                        storagePath:data.data?.fullPath,
+                        expiresAt:new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                    });
+                } catch (err) {
+                    res.status(500).json({
+                        message:"Error while uploading Data storage bucket",
+                        statusCode:500,
+                        Error:err
+                    })
+                }
             }
         }
         res.end();
@@ -206,6 +264,30 @@ app.post('/edit',authMiddleware,imageUploadMiddleware.array('images'),async(req,
         res.end();
     }
 
+})
+
+app.get('/history',authMiddleware,async(req,res) => {
+    const { userId } = req.body;
+    if(!userId) return res.status(400).json({
+        message:"Please send a status code",
+        statusCode:400
+    })
+
+    try {
+        const responses = await db.select().from(images).where(eq(userId,images.userId));
+
+        return res.status(200).json({
+            message:"Images fetched successfully",
+            statusCode:200,
+            data:responses
+        })
+    } catch (err) {
+        return res.status(500).json({
+            message:"Error while geting the images",
+            statusCode:500,
+            error:err
+        });
+    }
 })
 
 export { app };

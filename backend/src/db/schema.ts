@@ -3,8 +3,14 @@ import { relations } from "drizzle-orm";
 
 export type Source = { url: string; title: string };
 
+
+//Enums 
+export const imageTypeEnum = pgEnum("image_type", ["generate", "edit"]);
 export const providerEnum = pgEnum("provider", ["google", "github", "email"]);
 export const roleEnum = pgEnum("role", ["user", "assistant"]);
+
+
+// Tables
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey(),
@@ -28,6 +34,19 @@ export const messages = pgTable("messages", {
   content: text("content").notNull(),
   role: roleEnum("role").notNull().default("user"),
   sources: jsonb("sources").$type<Source[]>(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const images = pgTable("images", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  prompt: text("prompt").notNull(),
+  style: text("style").notNull(),
+  size: text("size").notNull(),
+  model: text("model").notNull(),
+  type: imageTypeEnum("type").notNull().default("generate"),
+  storagePath: text("storage_path").notNull(),   // path inside the bucket
+  expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
