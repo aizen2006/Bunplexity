@@ -15,11 +15,13 @@ function expiresInLabel(expiresAt: string): string {
 interface MediaGalleryProps {
   items: MediaItem[];
   onEdit?: (item: MediaItem) => void;
+  onDelete?: (item: MediaItem) => void;
+  deletingId?: string | null;
   loading?: boolean;
   emptyLabel?: string;
 }
 
-export default function MediaGallery({ items, onEdit, loading, emptyLabel = 'No images yet' }: MediaGalleryProps) {
+export default function MediaGallery({ items, onEdit, onDelete, deletingId, loading, emptyLabel = 'No images yet' }: MediaGalleryProps) {
   if (loading && items.length === 0) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -87,6 +89,24 @@ export default function MediaGallery({ items, onEdit, loading, emptyLabel = 'No 
                   <path d="M7 2V9M7 9L4 6M7 9L10 6M2.5 11.5H11.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </a>
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(item)}
+                  disabled={deletingId === item.id}
+                  aria-label="Delete image"
+                  className="flex items-center justify-center w-7 h-7 rounded-lg disabled:opacity-60"
+                  style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid #f87171', color: '#f87171' }}
+                >
+                  {deletingId === item.id ? (
+                    <span className="w-3.5 h-3.5 border-2 border-transparent rounded-full animate-spin" style={{ borderTopColor: '#f87171' }} />
+                  ) : (
+                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+                      <path d="M2.5 3.5H11.5M5.5 3.5V2.5H8.5V3.5M3.5 3.5L4 11.5H10L10.5 3.5M6 6V9M8 6V9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </button>
+              )}
             </div>
 
             <div className="flex flex-col gap-1">

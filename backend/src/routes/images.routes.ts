@@ -7,7 +7,7 @@ import { imageUploadMiddleware } from "../middleware";
 import { toFile } from "openai";
 import { db } from "../db";
 import { images } from "../db/schema";
-import uploadImage, { getImagePublicUrl } from "../lib/fileUpload";
+import uploadImage, { getImagePublicUrl, deleteImages } from "../lib/fileUpload";
 import { and, desc, eq, gt } from "drizzle-orm";
 import { log } from "../lib/logger";
 
@@ -91,7 +91,7 @@ const FORMAT_MAP: Record<string, { mime: string; ext: string }> = {
  */
 async function persistAndAnnounce(res: Response, base64: string, meta: ImageMeta) {
     try {
-        const { mime, ext } = FORMAT_MAP[meta.outputFormat] ?? FORMAT_MAP.png;
+        const { mime, ext } = FORMAT_MAP[meta.outputFormat] ?? { mime: "image/png", ext: "png" };
         const result = await uploadImage(Buffer.from(base64, "base64"), mime, ext);
         if (!result.uploadStatus || !result.data?.path) {
             log("error", "Image upload to bucket failed", result.error);
@@ -300,6 +300,41 @@ app.get('/history',authMiddleware,async(req,res) => {
             statusCode:500,
             error:err
         });
+    }
+})
+
+// ── DELETE /image/:id ────────────────────────────────────────────────────────
+// Remove the user's image from the storage bucket and the database. Scoped to
+// the authenticated user so one user can't delete another's images.
+app.delete('/:id', authMiddleware, async (req, res) => {
+    const parsed = z.uuid().safeParse(req.params.id);
+    if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid image id", statusCode: 400 });
+    }
+    const id = parsed.data;
+
+    try {
+        const [row] = await db
+            .select()
+            .from(images)
+            .where(and(eq(images.id, id), eq(images.userId, req.userId)));
+
+        if (!row) {
+            return res.status(404).json({ message: "Image not found", statusCode: 404 });
+        }
+
+        const { success, error } = await deleteImages([row.storagePath]);
+        if (!success) {
+            log("error", "Failed to delete image from bucket", error);
+            return res.status(500).json({ message: "Failed to delete image", statusCode: 500 });
+        }
+
+        await db.delete(images).where(eq(images.id, id));
+
+        return res.status(200).json({ message: "Image deleted successfully", statusCode: 200, id });
+    } catch (err) {
+        log("error", "Failed to delete image", err);
+        return res.status(500).json({ message: "Error while deleting the image", statusCode: 500, error: err });
     }
 })
 

@@ -14,6 +14,12 @@ export function getImagePublicUrl(path: string): string {
     return supabase.storage.from(IMAGE_BUCKET).getPublicUrl(path).data.publicUrl;
 }
 
+/** Remove one or more objects from the image bucket. */
+export async function deleteImages(paths: string[]) {
+    const { error } = await supabase.storage.from(IMAGE_BUCKET).remove(paths);
+    return { success: !error, error };
+}
+
 export default async function uploadImage(file:Buffer, contentType?: string, ext?: string){
     // 10 MB = 10485760 bytes
 

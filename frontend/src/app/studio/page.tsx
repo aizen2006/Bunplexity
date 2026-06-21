@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import ConversationSidebar from '@/components/ConversationSidebar';
 import StudioComposer, { type StudioMode } from '@/components/StudioComposer';
 import MediaGallery from '@/components/MediaGallery';
-import { generateImage, editImage, type SavedImage } from '@/lib/api';
+import { generateImage, editImage, deleteImage, type SavedImage } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { ImageOptions, MediaItem } from '@/types';
 import { DEFAULT_IMAGE_OPTIONS } from '@/types';
@@ -31,6 +31,7 @@ function StudioContent() {
   const [finalUrl, setFinalUrl] = useState<string | null>(null);
   const [sessionItems, setSessionItems] = useState<MediaItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const seededRef = useRef(false);
@@ -64,6 +65,22 @@ function StudioContent() {
       console.error('Failed to load reference image:', err);
     }
   }, []);
+
+  const deleteSessionItem = useCallback(async (item: MediaItem) => {
+    if (!auth.token || deletingId) return;
+    setDeletingId(item.id);
+    const prev = sessionItems;
+    setSessionItems(curr => curr.filter(i => i.id !== item.id));
+    try {
+      await deleteImage(auth.token, item.id);
+    } catch (err) {
+      console.error('Failed to delete image:', err);
+      setSessionItems(prev);
+      setError('Failed to delete the image');
+    } finally {
+      setDeletingId(null);
+    }
+  }, [auth.token, deletingId, sessionItems]);
 
   const handleSubmit = useCallback((prompt: string) => {
     if (!auth.token || loading) return;
@@ -188,7 +205,7 @@ function StudioContent() {
               <h3 className="text-[10px] uppercase tracking-widest mb-3" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
                 This session
               </h3>
-              <MediaGallery items={sessionItems} onEdit={loadAsReference} />
+              <MediaGallery items={sessionItems} onEdit={loadAsReference} onDelete={deleteSessionItem} deletingId={deletingId} />
             </div>
           )}
         </div>

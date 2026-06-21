@@ -384,3 +384,7 @@ export async function fetchLibrary(token: string): Promise<MediaItem[]> {
   const res = await request<{ data: MediaItem[] }>('/image/history', token);
   return res.data ?? [];
 }
+
+export function deleteImage(token: string, id: string): Promise<{ id: string }> {
+  return request<{ id: string }>(`/image/${id}`, token, { method: 'DELETE' });
+}
