@@ -73,7 +73,16 @@ interface ImageMeta {
     size: string;
     model: string;
     type: "generate" | "edit";
+    outputFormat: "png" | "jpeg" | "webp";
 }
+
+// Maps the requested output format to the Content-Type / extension we store the
+// object with, so the bucket's public URL renders directly in an <img> tag.
+const FORMAT_MAP: Record<string, { mime: string; ext: string }> = {
+    png:  { mime: "image/png",  ext: "png" },
+    jpeg: { mime: "image/jpeg", ext: "jpg" },
+    webp: { mime: "image/webp", ext: "webp" },
+};
 
 /**
  * Upload the final base64 image to the bucket, persist a row, and announce a
@@ -82,7 +91,8 @@ interface ImageMeta {
  */
 async function persistAndAnnounce(res: Response, base64: string, meta: ImageMeta) {
     try {
-        const result = await uploadImage(Buffer.from(base64, "base64"));
+        const { mime, ext } = FORMAT_MAP[meta.outputFormat] ?? FORMAT_MAP.png;
+        const result = await uploadImage(Buffer.from(base64, "base64"), mime, ext);
         if (!result.uploadStatus || !result.data?.path) {
             log("error", "Image upload to bucket failed", result.error);
             res.write(`data: ${JSON.stringify({ type: "error", message: "Failed to save image" })}\n\n`);
@@ -168,7 +178,7 @@ app.post('/generate',authMiddleware,async(req,res) => {
                 res.write(`data: ${JSON.stringify({ type: "completed" })}\n\n`);
                 if (latestB64) {
                     await persistAndAnnounce(res, latestB64, {
-                        userId: req.userId, prompt: query, style, size, model, type: "generate",
+                        userId: req.userId, prompt: query, style, size, model, type: "generate", outputFormat: output_format,
                     });
                 }
             }
@@ -242,7 +252,7 @@ app.post('/edit',authMiddleware,imageUploadMiddleware.array('images'),async(req,
                 res.write(`data: ${JSON.stringify({ type: "completed" })}\n\n`);
                 if (latestB64) {
                     await persistAndAnnounce(res, latestB64, {
-                        userId: req.userId, prompt: query, style, size, model, type: "edit",
+                        userId: req.userId, prompt: query, style, size, model, type: "edit", outputFormat: output_format,
                     });
                 }
             }

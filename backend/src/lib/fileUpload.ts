@@ -14,7 +14,7 @@ export function getImagePublicUrl(path: string): string {
     return supabase.storage.from(IMAGE_BUCKET).getPublicUrl(path).data.publicUrl;
 }
 
-export default async function uploadImage(file:Buffer){
+export default async function uploadImage(file:Buffer, contentType?: string, ext?: string){
     // 10 MB = 10485760 bytes
 
     if(file.length > 10485760){
@@ -24,12 +24,16 @@ export default async function uploadImage(file:Buffer){
             statusCode:400
         }
     }
-    const filePath = `${crypto.randomUUID().toString()}`;
+    // Include the file extension so the object is served with an image
+    // Content-Type. Without a contentType (or inferable extension) Supabase
+    // stores objects as `text/plain` + `nosniff`, which browsers refuse to
+    // render in <img>, making the public URL appear broken.
+    const filePath = ext ? `${crypto.randomUUID().toString()}.${ext}` : `${crypto.randomUUID().toString()}`;
 
     const { data, error } = await supabase
     .storage
     .from(IMAGE_BUCKET)
-    .upload(filePath,file);
+    .upload(filePath, file, contentType ? { contentType } : undefined);
 
     if(error){
         return {
