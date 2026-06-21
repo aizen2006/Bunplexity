@@ -104,6 +104,11 @@ async function persistAndAnnounce(res: Response, base64: string, meta: ImageMeta
             })
             .returning({ id: images.id, createdAt: images.createdAt });
 
+        if (!row) {
+            res.write(`data: ${JSON.stringify({ type: "error", message: "Failed to save image" })}\n\n`);
+            return;
+        }
+
         res.write(
             `data: ${JSON.stringify({
                 type: "saved",

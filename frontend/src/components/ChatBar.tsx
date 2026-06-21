@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect, useId } from 'react';
+import { useState, useRef, useCallback, useEffect, useId, type ChangeEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { transcribeAudio } from '@/lib/api';
-import type { ChatMode, ChatModel, ChatOptions } from '@/types';
+import FileUploadButton from '@/components/FileUploadButton';
+import FileChip from '@/components/FileChip';
+import type { ChatMode, ChatModel, ChatOptions, ProcessedFileResult } from '@/types';
 import { CHAT_MODEL_GROUPS, CHAT_MODELS, DEFAULT_CHAT_OPTIONS } from '@/types';
 
 interface ChatBarProps {
@@ -14,6 +16,10 @@ interface ChatBarProps {
   autoFocus?: boolean;
   initialValue?: string;
   defaultOptions?: Partial<ChatOptions>;
+  onFileAttach?: (file: File) => void;
+  onFileProcessed?: (result: ProcessedFileResult) => void;
+  attachedFile?: ProcessedFileResult | null;
+  onRemoveFile?: () => void;
 }
 
 function ModeToggle({ mode, onChange, pillId }: { mode: ChatMode; onChange: (m: ChatMode) => void; pillId: string }) {
@@ -216,6 +222,10 @@ export default function ChatBar({
   autoFocus = false,
   initialValue = '',
   defaultOptions,
+  onFileAttach,
+  onFileProcessed,
+  attachedFile,
+  onRemoveFile,
 }: ChatBarProps) {
   const [value, setValue] = useState(initialValue);
   const [focused, setFocused] = useState(false);
@@ -347,6 +357,11 @@ export default function ChatBar({
             : 'none',
         }}
       >
+        {attachedFile && (
+          <div className="pb-1">
+            <FileChip file={attachedFile} onRemove={onRemoveFile ?? (() => {})} />
+          </div>
+        )}
         <textarea
           ref={textareaRef}
           value={value}
@@ -376,6 +391,7 @@ export default function ChatBar({
               onToggle={() => setModelOpen(v => !v)}
               onChange={setModel}
             />
+            <FileUploadButton onFileAttach={onFileAttach} onFileProcessed={onFileProcessed ?? (() => {})} />
             <MicButton recording={recording} busy={transcribing} onToggle={onMicToggle} />
           </div>
 

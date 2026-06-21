@@ -1,5 +1,5 @@
 'use client';
-
+import { getHostname,getFaviconUrl } from '@/lib/urls';
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import type { Message, Source } from '@/types';
@@ -7,23 +7,6 @@ import type { Message, Source } from '@/types';
 interface SourcesTabProps {
   messages: Message[];
   liveSources?: Source[];
-}
-
-function getFaviconUrl(url: string): string {
-  try {
-    const { hostname } = new URL(url);
-    return `https://www.google.com/s2/favicons?domain=${hostname}&size=32`;
-  } catch {
-    return '';
-  }
-}
-
-function getHostname(url: string): string {
-  try {
-    return new URL(url).hostname.replace('www.', '');
-  } catch {
-    return url;
-  }
 }
 
 export function collectUniqueSources(messages: Message[], liveSources: Source[] = []): Source[] {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fetchConversations, deleteConversation, updateConversationTitle } from '@/lib/api';
@@ -227,6 +227,7 @@ function HistoryTab({
   setSearchVisible,
   onRename,
   onDelete,
+  loading,
 }: {
   conversations: Conversation[];
   activeConversationId?: string;
@@ -236,6 +237,7 @@ function HistoryTab({
   setSearchVisible: (v: boolean | ((prev: boolean) => boolean)) => void;
   onRename: (id: string, title: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  loading?: boolean;
 }) {
   const filtered = useMemo(
     () =>
@@ -302,6 +304,13 @@ function HistoryTab({
       </AnimatePresence>
 
       <nav className="flex-1 overflow-y-auto px-2 pb-4">
+        {loading && conversations.length === 0 ? (
+          <>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="animate-pulse h-8 rounded-lg mx-2 mb-1 bg-white/5" />
+            ))}
+          </>
+        ) : (
         <AnimatePresence mode="popLayout">
           {filtered.length === 0 ? (
             <motion.p
@@ -327,6 +336,7 @@ function HistoryTab({
             ))
           )}
         </AnimatePresence>
+        )}
       </nav>
     </motion.div>
   );
@@ -416,8 +426,61 @@ interface ConversationSidebarProps {
   activeConversationId?: string;
 }
 
+function StudioLibraryNav({ pathname, onNavigate }: { pathname: string | null; onNavigate: (href: string) => void }) {
+  const items: { href: string; label: string; icon: React.ReactNode }[] = [
+    {
+      href: '/studio',
+      label: 'Image Studio',
+      icon: (
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+          <path d="M8 1.5L9.4 5.1L13 6.5L9.4 7.9L8 11.5L6.6 7.9L3 6.5L6.6 5.1L8 1.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+          <path d="M12.5 10.5L13 12L14.5 12.5L13 13L12.5 14.5L12 13L10.5 12.5L12 12L12.5 10.5Z" fill="currentColor" />
+        </svg>
+      ),
+    },
+    {
+      href: '/library',
+      label: 'Library',
+      icon: (
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+          <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+          <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+          <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+          <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+        </svg>
+      ),
+    },
+  ];
+
+  return (
+    <div className="px-4 pb-1 flex flex-col gap-1">
+      {items.map(item => {
+        const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+        return (
+          <button
+            key={item.href}
+            type="button"
+            onClick={() => onNavigate(item.href)}
+            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-100"
+            style={{
+              color: active ? 'var(--accent)' : 'var(--fg-muted)',
+              background: active ? 'rgba(0,212,255,0.08)' : 'transparent',
+            }}
+            onMouseEnter={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)'; }}
+            onMouseLeave={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+          >
+            {item.icon}
+            {item.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function ConversationSidebar({ activeConversationId }: ConversationSidebarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const auth = useAuth();
   const isLoggedIn = auth.status === 'authenticated';
 
@@ -425,28 +488,45 @@ export default function ConversationSidebar({ activeConversationId }: Conversati
   const [activeTab, setActiveTab] = useState<SidebarTab>('history');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchVisible, setSearchVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!auth.token) return;
+    setLoading(true);
     (async () => {
       try {
         const convs = await fetchConversations(auth.token!);
         setConversations(convs);
       } catch { /* ignore */ }
+      finally { setLoading(false); }
     })();
   }, [auth.token, activeConversationId]);
 
+  const showError = (msg: string) => {
+    setError(msg);
+    setTimeout(() => setError(null), 3000);
+  };
+
   const handleRename = useCallback(async (id: string, title: string) => {
     if (!auth.token) return;
-    await updateConversationTitle(auth.token, id, title);
-    setConversations(prev => prev.map(c => (c.id === id ? { ...c, title } : c)));
+    try {
+      await updateConversationTitle(auth.token, id, title);
+      setConversations(prev => prev.map(c => (c.id === id ? { ...c, title } : c)));
+    } catch {
+      showError('Failed to rename conversation');
+    }
   }, [auth.token]);
 
   const handleDelete = useCallback(async (id: string) => {
     if (!auth.token) return;
-    await deleteConversation(auth.token, id);
-    setConversations(prev => prev.filter(c => c.id !== id));
-    if (id === activeConversationId) router.push('/chat/new');
+    try {
+      await deleteConversation(auth.token, id);
+      setConversations(prev => prev.filter(c => c.id !== id));
+      if (id === activeConversationId) router.push('/chat/new');
+    } catch {
+      showError('Failed to delete conversation');
+    }
   }, [auth.token, activeConversationId, router]);
 
   const tabs: { id: SidebarTab; label: string }[] = [
@@ -486,6 +566,9 @@ export default function ConversationSidebar({ activeConversationId }: Conversati
         </button>
       </div>
 
+      {/* Studio / Library navigation */}
+      <StudioLibraryNav pathname={pathname} onNavigate={(href) => router.push(href)} />
+
       {/* Tabs */}
       <div className="flex-shrink-0 px-4 pt-1">
         <div className="flex">
@@ -512,6 +595,17 @@ export default function ConversationSidebar({ activeConversationId }: Conversati
         <div style={{ borderBottom: '1px solid var(--fg-subtle)' }} />
       </div>
 
+      {/* Error banner */}
+      {error && (
+        <div
+          className="mx-3 mb-2 px-3 py-2 rounded-lg text-xs flex items-center justify-between"
+          style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171' }}
+        >
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="ml-2 opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
+
       {/* Tab content */}
       <AnimatePresence mode="wait">
         {activeTab === 'history' ? (
@@ -525,6 +619,7 @@ export default function ConversationSidebar({ activeConversationId }: Conversati
             setSearchVisible={setSearchVisible}
             onRename={handleRename}
             onDelete={handleDelete}
+            loading={loading}
           />
         ) : (
           <AgentTab key="agent" />

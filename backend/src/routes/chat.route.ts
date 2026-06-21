@@ -182,9 +182,12 @@ app.post("/chat/follow-up", authMiddleware, chatRateLimit, async (req, res) => {
         return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
     }
 
-    const { query, model, mode, conversationId } = parsed.data;
+    let { query, model, mode, conversationId, file_content } = parsed.data;
     const userId = req.userId;
     const config = modeConfig[mode];
+    if (!file_content) {
+        file_content = "";
+    }
 
     let webSearchResult: any[] = [];
     let output: any;
@@ -237,6 +240,7 @@ app.post("/chat/follow-up", authMiddleware, chatRateLimit, async (req, res) => {
         const prompt = FOLLOW_UP_PROMPT_TEMPLATE
             .replace("{{WEB_SEARCH_RESULTS}}", JSON.stringify(webSearchResult))
             .replace("{{USER_QUERY}}", query)
+            .replace("{{FILE_CONTENT}}", file_content)
             .replace("{{CONVERSATION_HISTORY}}", conversationHistory);
 
         // ── 5. Create stream ──────────────────────────────────────────────────

@@ -62,6 +62,11 @@ export interface Source {
   url: string;
 }
 
+export interface ProcessedFileResult {
+  fileName: string;
+  fileContext: string;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -69,4 +74,73 @@ export interface User {
   provider: string;
   credits: number;
   createdAt: string;
+}
+
+// ── Image Studio / Media Library ─────────────────────────────────────────────
+
+export type ImageStyle =
+  | 'Realistic'
+  | 'Cinematic'
+  | 'Anime'
+  | '3D Render'
+  | 'Watercolor'
+  | 'Oil Painting'
+  | 'Pixel Art'
+  | 'Comic Book'
+  | 'Minimalist'
+  | 'Cyberpunk'
+  | 'Fantasy'
+  | 'Vintage'
+  | 'Sketch'
+  | 'Cartoon'
+  | 'Studio Photo';
+
+export const IMAGE_STYLES: ImageStyle[] = [
+  'Realistic', 'Cinematic', 'Anime', '3D Render', 'Watercolor', 'Oil Painting',
+  'Pixel Art', 'Comic Book', 'Minimalist', 'Cyberpunk', 'Fantasy', 'Vintage',
+  'Sketch', 'Cartoon', 'Studio Photo',
+];
+
+export type ImageSize = 'auto' | '1024x1024' | '1536x1024' | '1024x1536';
+export const IMAGE_SIZES: { value: ImageSize; label: string }[] = [
+  { value: 'auto', label: 'Auto' },
+  { value: '1024x1024', label: 'Square' },
+  { value: '1536x1024', label: 'Landscape' },
+  { value: '1024x1536', label: 'Portrait' },
+];
+
+export type ImageQuality = 'auto' | 'high' | 'medium' | 'low';
+export const IMAGE_QUALITIES: ImageQuality[] = ['auto', 'high', 'medium', 'low'];
+
+export type ImageModel = 'gpt-image-1' | 'gpt-image-2';
+
+export type ImageOutputFormat = 'png' | 'jpeg' | 'webp';
+
+export interface ImageOptions {
+  style: ImageStyle;
+  size: ImageSize;
+  quality: ImageQuality;
+  model: ImageModel;
+  output_format: ImageOutputFormat;
+}
+
+export const DEFAULT_IMAGE_OPTIONS: ImageOptions = {
+  style: 'Realistic',
+  size: 'auto',
+  quality: 'auto',
+  model: 'gpt-image-1',
+  output_format: 'jpeg',
+};
+
+/** A generated/edited image as returned by the Library (and `saved` SSE frame). */
+export interface MediaItem {
+  id: string;
+  kind: 'image';
+  url: string;
+  prompt: string;
+  style: string;
+  model: string;
+  type: 'generate' | 'edit';
+  createdAt: string;
+  expiresAt: string;
 }

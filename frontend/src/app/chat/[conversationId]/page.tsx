@@ -9,7 +9,7 @@ import ChatBar from '@/components/ChatBar';
 import SourcesTab, { collectUniqueSources } from '@/components/SourcesTab';
 import { fetchConversation, streamChat, AuthError } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
-import type { ChatModel, ChatOptions, Message, Source } from '@/types';
+import type { ChatModel, ChatOptions, Message, Source, ProcessedFileResult } from '@/types';
 import { DEFAULT_CHAT_OPTIONS } from '@/types';
 
 interface PageProps {
@@ -30,6 +30,7 @@ function ChatContent({ conversationId }: { conversationId: string }) {
   const [title, setTitle] = useState('');
   const [streamError, setStreamError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'chat' | 'sources'>('chat');
+  const [attachedFile, setAttachedFile] = useState<ProcessedFileResult | null>(null);
 
   const [chatOptions, setChatOptions] = useState<ChatOptions>(DEFAULT_CHAT_OPTIONS);
 
@@ -37,8 +38,9 @@ function ChatContent({ conversationId }: { conversationId: string }) {
   const startedRef = useRef(false);
   const streamingRef = useRef(false);
   const chatOptionsRef = useRef<ChatOptions>(DEFAULT_CHAT_OPTIONS);
+  const setStreamingBoth = (val: boolean) => { streamingRef.current = val; setStreaming(val); };
 
-  useEffect(() => { streamingRef.current = streaming; }, [streaming]);
+  useEffect(() => { setStreamingBoth(streaming) }, [streaming]);
   useEffect(() => { chatOptionsRef.current = chatOptions; }, [chatOptions]);
 
   const messagesRef = useRef<Message[]>([]);
@@ -57,7 +59,7 @@ function ChatContent({ conversationId }: { conversationId: string }) {
     };
     setChatOptions(seeded);
     chatOptionsRef.current = seeded;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps — runs once on mount; searchParams intentionally excluded to avoid re-seeding on navigation
   }, []);
 
   // Redirect when unauthenticated; preserve intended destination in ?next
@@ -100,12 +102,14 @@ function ChatContent({ conversationId }: { conversationId: string }) {
         createdAt: new Date().toISOString(),
       };
 
+      const fileContext = attachedFile?.fileContext;
+      setAttachedFile(null);
+
       setMessages(prev => [...prev, userMsg]);
       setStreamingText('');
       setSources([]);
       setStreamError(null);
-      setStreaming(true);
-      streamingRef.current = true;
+      setStreamingBoth(true);
 
       let accumulatedText = '';
       let resolvedSources: Source[] = [];
@@ -138,23 +142,21 @@ function ChatContent({ conversationId }: { conversationId: string }) {
           };
           setMessages(prev => [...prev, assistantMsg]);
           setStreamingText('');
-          setStreaming(false);
-          streamingRef.current = false;
+          setStreamingBoth(false);
         },
         onError: err => {
           console.error('Stream error:', err);
-          setStreaming(false);
+          setStreamingBoth(false);
           setStreamingText('');
-          streamingRef.current = false;
           if (err instanceof AuthError) {
             router.push('/login');
             return;
           }
           setStreamError(err.message || 'Something went wrong. Please try again.');
         },
-      }, endpoint);
+      }, fileContext, endpoint);
     },
-    [auth.token, conversationId, router]
+    [auth.token, attachedFile, conversationId, router]
   );
 
   // Auto-start from ?q= param
@@ -285,6 +287,9 @@ function ChatContent({ conversationId }: { conversationId: string }) {
               loading={streaming}
               placeholder="Ask a follow-up..."
               defaultOptions={chatOptions}
+              attachedFile={attachedFile}
+              onFileProcessed={setAttachedFile}
+              onRemoveFile={() => setAttachedFile(null)}
             />
           </div>
         </div>
