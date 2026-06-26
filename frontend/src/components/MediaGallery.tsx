@@ -26,7 +26,7 @@ export default function MediaGallery({ items, onEdit, onDelete, deletingId, load
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="aspect-square rounded-xl animate-pulse bg-white/5" />
+          <div key={i} className="aspect-square rounded-xl animate-pulse" style={{ background: 'var(--bg-sunken)' }} />
         ))}
       </div>
     );
@@ -69,7 +69,7 @@ export default function MediaGallery({ items, onEdit, onDelete, deletingId, load
                   onClick={() => onEdit(item)}
                   aria-label="Edit image"
                   className="flex items-center justify-center w-7 h-7 rounded-lg"
-                  style={{ background: 'rgba(0,212,255,0.15)', border: '1px solid var(--accent)', color: 'var(--accent)' }}
+                  style={{ background: 'rgba(var(--accent-rgb),0.15)', border: '1px solid var(--accent)', color: 'var(--accent)' }}
                 >
                   <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
                     <path d="M9.5 2L12 4.5L5 11.5H2.5V9L9.5 2Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
@@ -96,10 +96,10 @@ export default function MediaGallery({ items, onEdit, onDelete, deletingId, load
                   disabled={deletingId === item.id}
                   aria-label="Delete image"
                   className="flex items-center justify-center w-7 h-7 rounded-lg disabled:opacity-60"
-                  style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid #f87171', color: '#f87171' }}
+                  style={{ background: 'rgba(var(--danger-rgb),0.15)', border: '1px solid var(--danger)', color: 'var(--danger)' }}
                 >
                   {deletingId === item.id ? (
-                    <span className="w-3.5 h-3.5 border-2 border-transparent rounded-full animate-spin" style={{ borderTopColor: '#f87171' }} />
+                    <span className="w-3.5 h-3.5 border-2 border-transparent rounded-full animate-spin" style={{ borderTopColor: 'var(--danger)' }} />
                   ) : (
                     <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
                       <path d="M2.5 3.5H11.5M5.5 3.5V2.5H8.5V3.5M3.5 3.5L4 11.5H10L10.5 3.5M6 6V9M8 6V9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
@@ -112,7 +112,7 @@ export default function MediaGallery({ items, onEdit, onDelete, deletingId, load
             <div className="flex flex-col gap-1">
               <p className="text-[11px] line-clamp-2" style={{ color: '#fff' }}>{item.prompt}</p>
               <div className="flex items-center justify-between">
-                <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(0,212,255,0.15)', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
+                <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(var(--accent-rgb),0.15)', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
                   {item.style}
                 </span>
                 <span className="text-[9px]" style={{ color: 'rgba(255,255,255,0.6)', fontFamily: 'var(--font-mono)' }}>

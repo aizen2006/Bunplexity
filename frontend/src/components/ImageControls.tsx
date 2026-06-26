@@ -17,10 +17,11 @@ interface ImageControlsProps {
 }
 
 const selectStyle: React.CSSProperties = {
-  background: 'var(--bg-base)',
-  border: '1px solid var(--fg-subtle)',
+  background: 'var(--bg-surface)',
+  border: '1px solid var(--border)',
   color: 'var(--fg-primary)',
   fontFamily: 'var(--font-mono)',
+  boxShadow: 'var(--shadow-soft)',
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -41,7 +42,7 @@ export default function ImageControls({ options, onChange, disabled }: ImageCont
   const set = <K extends keyof ImageOptions>(key: K, value: ImageOptions[K]) =>
     onChange({ ...options, [key]: value });
 
-  const cls = 'rounded-lg px-2.5 py-1.5 text-xs outline-none disabled:opacity-50 cursor-pointer';
+  const cls = 'rounded-full px-3 py-1.5 text-xs outline-none disabled:opacity-50 cursor-pointer';
 
   return (
     <div className="flex flex-wrap gap-3">

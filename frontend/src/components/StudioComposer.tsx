@@ -57,21 +57,21 @@ export default function StudioComposer({
 
   return (
     <div
-      className="flex flex-col gap-3 rounded-2xl p-4"
-      style={{ background: 'var(--bg-elevated)', border: '1px solid var(--fg-subtle)' }}
+      className="flex flex-col gap-3 rounded-[22px] p-5"
+      style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-raised)' }}
     >
       {/* Mode toggle */}
-      <div className="flex items-center gap-1 rounded-lg p-1 w-fit" style={{ background: 'var(--bg-base)', border: '1px solid var(--fg-subtle)' }}>
+      <div className="flex items-center gap-1 rounded-full p-1 w-fit" style={{ background: 'var(--bg-sunken)', border: '1px solid var(--border)' }}>
         {(['generate', 'edit'] as const).map(m => (
           <button
             key={m}
             type="button"
             onClick={() => onModeChange(m)}
-            className="px-3 py-1 rounded-md text-xs font-medium capitalize transition-colors"
+            className="px-3.5 py-1 rounded-full text-xs font-medium capitalize transition-colors"
             style={{
               fontFamily: 'var(--font-mono)',
               background: mode === m ? 'var(--accent)' : 'transparent',
-              color: mode === m ? 'var(--bg-base)' : 'var(--fg-muted)',
+              color: mode === m ? 'var(--on-accent)' : 'var(--fg-muted)',
             }}
           >
             {m}
@@ -140,12 +140,12 @@ export default function StudioComposer({
           type="button"
           onClick={submit}
           disabled={!canSubmit}
-          className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-opacity disabled:opacity-30"
-          style={{ background: 'var(--accent)', color: 'var(--bg-base)' }}
+          className="flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-opacity disabled:opacity-30"
+          style={{ background: 'var(--accent)', color: 'var(--on-accent)', boxShadow: 'var(--shadow-raised)' }}
         >
           {loading ? (
             <>
-              <span className="w-4 h-4 border-2 border-transparent rounded-full animate-spin" style={{ borderTopColor: 'var(--bg-base)' }} />
+              <span className="w-4 h-4 border-2 border-transparent rounded-full animate-spin" style={{ borderTopColor: 'var(--on-accent)' }} />
               Generating…
             </>
           ) : (

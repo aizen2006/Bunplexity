@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { fetchConversations, deleteConversation, updateConversationTitle } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import UserMenu from '@/components/UserMenu';
+import ThemeToggle from '@/components/ThemeToggle';
 import type { Conversation } from '@/types';
 
 function relativeTime(iso: string): string {
@@ -153,7 +154,7 @@ function ConversationItem({
         {/* Right cluster */}
         {confirmingDelete ? (
           <div className="flex items-center gap-1 flex-shrink-0" onClick={stop}>
-            <span className="text-[10px]" style={{ color: '#f87171', fontFamily: 'var(--font-mono)' }}>
+            <span className="text-[10px]" style={{ color: 'var(--danger)', fontFamily: 'var(--font-mono)' }}>
               Delete?
             </span>
             <button
@@ -162,7 +163,7 @@ function ConversationItem({
               onClick={e => { stop(e); confirmDelete(); }}
               aria-label="Confirm delete"
               className="p-1 rounded"
-              style={{ color: '#f87171' }}
+              style={{ color: 'var(--danger)' }}
             >
               <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
                 <path d="M2 5.5L4.5 8L9 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -200,7 +201,7 @@ function ConversationItem({
               aria-label="Delete"
               className="p-1 rounded transition-colors"
               style={{ color: 'var(--fg-muted)' }}
-              onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.color = '#f87171')}
+              onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--danger)')}
               onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--fg-muted)')}
             >
               <TrashIcon />
@@ -307,7 +308,7 @@ function HistoryTab({
         {loading && conversations.length === 0 ? (
           <>
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="animate-pulse h-8 rounded-lg mx-2 mb-1 bg-white/5" />
+              <div key={i} className="animate-pulse h-8 rounded-lg mx-2 mb-1" style={{ background: 'var(--bg-sunken)' }} />
             ))}
           </>
         ) : (
@@ -360,9 +361,9 @@ function AgentTab() {
         }}
         animate={{
           boxShadow: [
-            '0 0 0 0 rgba(0,212,255,0)',
-            '0 0 20px 2px rgba(0,212,255,0.12)',
-            '0 0 0 0 rgba(0,212,255,0)',
+            '0 0 0 0 rgba(var(--accent-rgb),0)',
+            '0 0 20px 2px rgba(var(--accent-rgb),0.12)',
+            '0 0 0 0 rgba(var(--accent-rgb),0)',
           ],
         }}
         transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
@@ -370,7 +371,7 @@ function AgentTab() {
         <div className="mb-4 flex justify-center">
           <div
             className="w-12 h-12 rounded-full flex items-center justify-center"
-            style={{ background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.2)' }}
+            style={{ background: 'var(--accent-dim)', border: '1px solid rgba(var(--accent-rgb),0.2)' }}
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path
@@ -400,15 +401,15 @@ function AgentTab() {
         <div
           className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium relative overflow-hidden"
           style={{
-            background: 'rgba(0,212,255,0.06)',
-            border: '1px solid rgba(0,212,255,0.2)',
+            background: 'rgba(var(--accent-rgb),0.06)',
+            border: '1px solid rgba(var(--accent-rgb),0.2)',
             color: 'var(--accent)',
           }}
         >
           <motion.div
             className="absolute inset-0 rounded-full"
             style={{
-              background: 'linear-gradient(90deg, transparent, rgba(0,212,255,0.18), transparent)',
+              background: 'linear-gradient(90deg, transparent, rgba(var(--accent-rgb),0.18), transparent)',
             }}
             animate={{ x: ['-100%', '200%'] }}
             transition={{ duration: 2, repeat: Infinity, ease: 'linear', repeatDelay: 1 }}
@@ -464,9 +465,9 @@ function StudioLibraryNav({ pathname, onNavigate }: { pathname: string | null; o
             className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-100"
             style={{
               color: active ? 'var(--accent)' : 'var(--fg-muted)',
-              background: active ? 'rgba(0,212,255,0.08)' : 'transparent',
+              background: active ? 'var(--accent-dim)' : 'transparent',
             }}
-            onMouseEnter={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)'; }}
+            onMouseEnter={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-sunken)'; }}
             onMouseLeave={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
           >
             {item.icon}
@@ -557,7 +558,7 @@ export default function ConversationSidebar({ activeConversationId }: Conversati
         <button
           onClick={() => router.push('/chat/new')}
           className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-opacity duration-150 hover:opacity-90"
-          style={{ background: 'var(--accent)', color: 'var(--bg-base)' }}
+          style={{ background: 'var(--accent)', color: 'var(--on-accent)', boxShadow: 'var(--shadow-soft)' }}
         >
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <path d="M6.5 1V12M1 6.5H12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -599,7 +600,7 @@ export default function ConversationSidebar({ activeConversationId }: Conversati
       {error && (
         <div
           className="mx-3 mb-2 px-3 py-2 rounded-lg text-xs flex items-center justify-between"
-          style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171' }}
+          style={{ background: 'rgba(var(--danger-rgb),0.1)', border: '1px solid rgba(var(--danger-rgb),0.3)', color: 'var(--danger)' }}
         >
           <span>{error}</span>
           <button onClick={() => setError(null)} className="ml-2 opacity-60 hover:opacity-100">✕</button>
@@ -627,18 +628,21 @@ export default function ConversationSidebar({ activeConversationId }: Conversati
       </AnimatePresence>
 
       {/* Footer */}
-      <div className="px-2 py-2 border-t flex-shrink-0" style={{ borderColor: 'var(--fg-subtle)' }}>
-        {isLoggedIn ? (
-          <UserMenu onSignOut={auth.signOut} />
-        ) : (
-          <button
-            onClick={() => router.push('/login')}
-            className="w-full flex items-center justify-center py-2 rounded-lg text-xs transition-opacity duration-150 hover:opacity-70"
-            style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}
-          >
-            Sign in
-          </button>
-        )}
+      <div className="px-2 py-2 border-t flex-shrink-0 flex items-center gap-2" style={{ borderColor: 'var(--border)' }}>
+        <div className="flex-1 min-w-0">
+          {isLoggedIn ? (
+            <UserMenu onSignOut={auth.signOut} />
+          ) : (
+            <button
+              onClick={() => router.push('/login')}
+              className="w-full flex items-center justify-center py-2 rounded-lg text-xs transition-opacity duration-150 hover:opacity-70"
+              style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}
+            >
+              Sign in
+            </button>
+          )}
+        </div>
+        <ThemeToggle />
       </div>
     </motion.aside>
   );

@@ -26,7 +26,7 @@ function ModeToggle({ mode, onChange, pillId }: { mode: ChatMode; onChange: (m: 
   return (
     <div
       className="relative flex items-center rounded-full p-0.5 select-none"
-      style={{ background: 'var(--bg-base)', border: '1px solid var(--fg-subtle)' }}
+      style={{ background: 'var(--bg-sunken)', border: '1px solid var(--border)' }}
     >
       {(['fast', 'thinking'] as const).map(m => (
         <button
@@ -34,7 +34,7 @@ function ModeToggle({ mode, onChange, pillId }: { mode: ChatMode; onChange: (m: 
           type="button"
           onClick={() => onChange(m)}
           className="relative z-10 px-2.5 py-0.5 text-[11px] font-medium rounded-full transition-colors duration-150 capitalize"
-          style={{ color: mode === m ? 'var(--bg-base)' : 'var(--fg-muted)' }}
+          style={{ color: mode === m ? 'var(--on-accent)' : 'var(--fg-muted)' }}
         >
           {m === 'fast' ? 'Fast' : 'Thinking'}
         </button>
@@ -71,12 +71,13 @@ function ModelSelector({
       <button
         type="button"
         onClick={onToggle}
-        className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[11px] transition-all duration-150"
+        className="flex items-center gap-1.5 px-3 h-8 rounded-full text-[11px] transition-all duration-150"
         style={{
-          background: open ? 'rgba(0,212,255,0.08)' : 'transparent',
+          background: open ? 'var(--accent-dim)' : 'var(--bg-surface)',
           border: '1px solid',
-          borderColor: open ? 'var(--accent)' : 'var(--fg-subtle)',
+          borderColor: open ? 'var(--accent)' : 'var(--border)',
           color: open ? 'var(--accent)' : 'var(--fg-muted)',
+          boxShadow: 'var(--shadow-soft)',
         }}
       >
         <span style={{ fontFamily: 'var(--font-mono)' }}>{selectedLabel}</span>
@@ -99,11 +100,11 @@ function ModelSelector({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -4 }}
             transition={{ duration: 0.12, ease: 'easeOut' }}
-            className="absolute bottom-full mb-1.5 left-0 rounded-xl overflow-hidden z-50 min-w-[180px]"
+            className="absolute bottom-full mb-1.5 left-0 rounded-[18px] overflow-hidden z-50 min-w-[180px]"
             style={{
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--fg-subtle)',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              boxShadow: 'var(--shadow-float)',
               maxHeight: '260px',
               overflowY: 'auto',
             }}
@@ -112,7 +113,7 @@ function ModelSelector({
               <div key={group.group}>
                 <div
                   className="px-3 py-1.5 text-[10px] uppercase tracking-wider"
-                  style={{ color: 'var(--fg-subtle)', fontFamily: 'var(--font-mono)', background: 'var(--bg-base)' }}
+                  style={{ color: 'var(--fg-faint)', fontFamily: 'var(--font-mono)', background: 'var(--bg-sunken)' }}
                 >
                   {group.group}
                 </div>
@@ -123,11 +124,11 @@ function ModelSelector({
                     onClick={() => { onChange(m.value); onToggle(); }}
                     className="w-full flex flex-col items-start px-3 py-2 text-left transition-colors duration-100"
                     style={{
-                      background: model === m.value ? 'rgba(0,212,255,0.06)' : 'transparent',
+                      background: model === m.value ? 'var(--accent-dim)' : 'transparent',
                       borderLeft: model === m.value ? '2px solid var(--accent)' : '2px solid transparent',
                     }}
                     onMouseEnter={e => {
-                      if (model !== m.value) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)';
+                      if (model !== m.value) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-sunken)';
                     }}
                     onMouseLeave={e => {
                       if (model !== m.value) (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
@@ -175,21 +176,22 @@ function MicButton({
       onClick={onToggle}
       disabled={busy && !recording}
       aria-label={recording ? 'Stop recording' : 'Start recording'}
-      className="relative flex items-center justify-center w-7 h-7 rounded-lg transition-colors disabled:opacity-50"
+      className="relative flex items-center justify-center w-8 h-8 rounded-full transition-colors disabled:opacity-50"
       style={{
-        background: recording ? 'rgba(239,68,68,0.15)' : 'transparent',
+        background: recording ? 'rgba(var(--danger-rgb),0.15)' : 'var(--bg-surface)',
         border: '1px solid',
-        borderColor: recording ? '#f87171' : 'var(--fg-subtle)',
-        color: recording ? '#f87171' : 'var(--fg-muted)',
+        borderColor: recording ? 'var(--danger)' : 'var(--border)',
+        color: recording ? 'var(--danger)' : 'var(--fg-muted)',
+        boxShadow: 'var(--shadow-soft)',
       }}
     >
       {recording ? <StopIcon /> : <MicIcon />}
       {recording && (
         <motion.span
-          className="absolute inset-0 rounded-lg pointer-events-none"
+          className="absolute inset-0 rounded-full pointer-events-none"
           animate={{ opacity: [0.6, 0, 0.6] }}
           transition={{ duration: 1.4, repeat: Infinity }}
-          style={{ boxShadow: '0 0 0 2px rgba(239,68,68,0.4)' }}
+          style={{ boxShadow: '0 0 0 2px rgba(var(--danger-rgb),0.4)' }}
         />
       )}
     </button>
@@ -202,11 +204,11 @@ function RecordingStatus() {
       role="status"
       aria-live="polite"
       className="flex items-center gap-1.5 text-[10px]"
-      style={{ color: '#f87171', fontFamily: 'var(--font-mono)' }}
+      style={{ color: 'var(--danger)', fontFamily: 'var(--font-mono)' }}
     >
       <motion.span
         className="w-1.5 h-1.5 rounded-full"
-        style={{ background: '#f87171' }}
+        style={{ background: 'var(--danger)' }}
         animate={{ opacity: [1, 0.3, 1] }}
         transition={{ duration: 1.2, repeat: Infinity }}
       />
@@ -348,13 +350,13 @@ export default function ChatBar({
       className="relative w-full"
     >
       <div
-        className="flex flex-col gap-2 rounded-xl px-3.5 pt-2.5 pb-1.5 transition-all duration-200"
+        className="flex flex-col gap-2 rounded-[26px] px-4 pt-3 pb-2 transition-all duration-200"
         style={{
-          background: 'var(--bg-elevated)',
-          border: focused ? '1px solid var(--accent)' : '1px solid var(--fg-subtle)',
+          background: 'var(--bg-surface)',
+          border: focused ? '1px solid var(--accent)' : '1px solid var(--border)',
           boxShadow: focused
-            ? '0 0 0 1px var(--accent), 0 0 24px rgba(0, 212, 255, 0.06)'
-            : 'none',
+            ? '0 0 0 1px var(--accent), var(--shadow-float)'
+            : 'var(--shadow-raised)',
         }}
       >
         {attachedFile && (
@@ -398,8 +400,12 @@ export default function ChatBar({
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-150 disabled:opacity-30"
-            style={{ background: canSubmit ? 'var(--accent)' : 'var(--fg-subtle)' }}
+            className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-full transition-all duration-150 disabled:opacity-40"
+            style={{
+              background: canSubmit ? 'var(--accent)' : 'var(--bg-sunken)',
+              border: canSubmit ? 'none' : '1px solid var(--border)',
+              boxShadow: canSubmit ? 'var(--shadow-raised)' : 'none',
+            }}
             aria-label="Submit"
           >
             {loading ? (
@@ -407,14 +413,14 @@ export default function ChatBar({
                 animate={{ rotate: 360 }}
                 transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
                 className="w-4 h-4 border-2 border-transparent rounded-full"
-                style={{ borderTopColor: 'var(--bg-base)' }}
+                style={{ borderTopColor: 'var(--on-accent)' }}
               />
             ) : (
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <svg width="15" height="15" viewBox="0 0 14 14" fill="none">
                 <path
                   d="M7 12V2M7 2L3 6M7 2L11 6"
-                  stroke={canSubmit ? '#0d0d0d' : '#6b6b6b'}
-                  strokeWidth="1.5"
+                  stroke={canSubmit ? 'var(--on-accent)' : 'var(--fg-faint)'}
+                  strokeWidth="1.6"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />

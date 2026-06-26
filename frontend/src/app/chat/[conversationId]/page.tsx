@@ -270,7 +270,7 @@ function ChatContent({ conversationId }: { conversationId: string }) {
 
         {/* Stream error banner */}
         {streamError && (
-          <div className="mx-6 mb-1 px-4 py-2 rounded-lg text-sm flex items-center justify-between" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171' }}>
+          <div className="mx-6 mb-1 px-4 py-2 rounded-lg text-sm flex items-center justify-between" style={{ background: 'rgba(var(--danger-rgb),0.1)', border: '1px solid rgba(var(--danger-rgb),0.3)', color: 'var(--danger)' }}>
             <span>{streamError}</span>
             <button onClick={() => setStreamError(null)} className="ml-3 opacity-60 hover:opacity-100 text-xs">✕</button>
           </div>

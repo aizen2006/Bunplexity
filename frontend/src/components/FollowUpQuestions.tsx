@@ -31,11 +31,12 @@ export default function FollowUpQuestions({ questions, onSelect }: FollowUpQuest
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: i * 0.06 }}
-            className="text-xs px-3 py-1.5 rounded-full text-left transition-all duration-150"
+            className="text-xs px-3.5 py-2 rounded-full text-left transition-all duration-150"
             style={{
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--fg-subtle)',
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
               color: 'var(--fg-muted)',
+              boxShadow: 'var(--shadow-soft)',
             }}
             onMouseEnter={e => {
               (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)';

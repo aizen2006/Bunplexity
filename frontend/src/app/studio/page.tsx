@@ -158,7 +158,7 @@ function StudioContent() {
               {error && (
                 <div
                   className="px-4 py-2 rounded-lg text-sm flex items-center justify-between"
-                  style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171' }}
+                  style={{ background: 'rgba(var(--danger-rgb),0.1)', border: '1px solid rgba(var(--danger-rgb),0.3)', color: 'var(--danger)' }}
                 >
                   <span>{error}</span>
                   <button onClick={() => setError(null)} className="ml-3 opacity-60 hover:opacity-100 text-xs">✕</button>
@@ -181,7 +181,7 @@ function StudioContent() {
                         className="absolute inset-0 pointer-events-none"
                         animate={{ opacity: [0.15, 0.35, 0.15] }}
                         transition={{ duration: 1.4, repeat: Infinity }}
-                        style={{ background: 'linear-gradient(110deg, transparent, rgba(0,212,255,0.12), transparent)' }}
+                        style={{ background: 'linear-gradient(110deg, transparent, rgba(var(--accent-rgb),0.12), transparent)' }}
                       />
                     )}
                   </>

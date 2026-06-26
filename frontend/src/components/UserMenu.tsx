@@ -112,7 +112,7 @@ export default function UserMenu({ onSignOut }: UserMenuProps) {
             style={{
               background: 'var(--bg-elevated)',
               border: '1px solid var(--fg-subtle)',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+              boxShadow: 'var(--shadow-float)',
             }}
           >
             <div
@@ -183,8 +183,8 @@ export default function UserMenu({ onSignOut }: UserMenuProps) {
                 borderTop: '1px solid var(--fg-subtle)',
               }}
               onMouseEnter={e => {
-                (e.currentTarget as HTMLButtonElement).style.color = '#f87171';
-                (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.08)';
+                (e.currentTarget as HTMLButtonElement).style.color = 'var(--danger)';
+                (e.currentTarget as HTMLButtonElement).style.background = 'rgba(var(--danger-rgb),0.08)';
               }}
               onMouseLeave={e => {
                 (e.currentTarget as HTMLButtonElement).style.color = 'var(--fg-muted)';

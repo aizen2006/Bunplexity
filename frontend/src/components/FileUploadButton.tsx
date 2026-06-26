@@ -59,11 +59,12 @@ export default function FileUploadButton({ onFileAttach, onFileProcessed }: File
         onClick={handleClick}
         disabled={uploading}
         aria-label="Upload file"
-        className="relative flex items-center justify-center w-7 h-7 rounded-lg transition-colors disabled:opacity-50"
+        className="relative flex items-center justify-center w-8 h-8 rounded-full transition-colors disabled:opacity-50"
         style={{
-          background: 'transparent',
-          border: '1px solid var(--fg-subtle)',
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border)',
           color: 'var(--fg-muted)',
+          boxShadow: 'var(--shadow-soft)',
         }}
       >
         {uploading ? (

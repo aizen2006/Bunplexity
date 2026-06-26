@@ -1,37 +1,101 @@
 @import "tailwindcss";
 
+/* AetherAI design system — light + dark, driven by [data-theme] (next-themes) */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* Map Tailwind color/radius/shadow utilities onto the live theme variables */
 @theme inline {
-  --color-bg-base: #0d0d0d;
-  --color-bg-surface: #141414;
-  --color-bg-elevated: #1c1c1c;
-  --color-fg-primary: #e8e8e8;
-  --color-fg-muted: #6b6b6b;
-  --color-fg-subtle: #333333;
-  --color-accent: #00d4ff;
-  --font-heading: var(--font-syne);
-  --font-body: var(--font-geist-sans);
+  --color-bg-base: var(--bg-base);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-sunken: var(--bg-sunken);
+  --color-border: var(--border);
+  --color-fg-primary: var(--fg-primary);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-faint: var(--fg-faint);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
+
+  --font-heading: var(--font-jakarta);
+  --font-body: var(--font-jakarta);
   --font-mono: var(--font-jetbrains-mono);
 }
 
-:root {
+/* ===== Light theme (default) ===== */
+:root,
+[data-theme="light"] {
+  --bg-base: #f4f3f1;      /* Canvas    */
+  --bg-surface: #ffffff;   /* Surface   */
+  --bg-elevated: #ffffff;  /* Elevated  */
+  --bg-sunken: #f6f6f5;    /* Sunken    */
+  --border: #ececea;       /* Border    */
+  --fg-primary: #1b1b1a;   /* Ink       */
+  --fg-muted: #8e8e8c;     /* Ink Muted */
+  --fg-faint: #b7b7b5;     /* Ink Faint */
+  --fg-subtle: var(--border); /* back-compat alias (borders/dividers) */
+
   --accent: #00d4ff;
-  --accent-dim: rgba(0, 212, 255, 0.08);
-  --bg-base: #0d0d0d;
-  --bg-surface: #141414;
-  --bg-elevated: #1c1c1c;
-  --fg-primary: #e8e8e8;
-  --fg-muted: #6b6b6b;
-  --fg-subtle: #333333;
+  --accent-rgb: 0, 212, 255;
+  --accent-dim: rgba(var(--accent-rgb), 0.08);
+  --on-accent: #06232b; /* dark ink for text/icons on the light cyan accent */
+
+  --danger: #e0564f;
+  --danger-rgb: 224, 86, 79;
+
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-raised: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-float: 0 20px 50px rgba(0, 0, 0, 0.12);
+
+  --canvas-gradient: radial-gradient(120% 80% at 50% -10%, #fbfbfa 0%, #f2f1ee 55%, #ecebe8 100%);
+
+  color-scheme: light;
+}
+
+/* ===== Dark theme ===== */
+[data-theme="dark"] {
+  --bg-base: #161718;      /* Canvas    */
+  --bg-surface: #202123;   /* Surface   */
+  --bg-elevated: #2a2b2d;  /* Elevated  */
+  --bg-sunken: #202123;    /* Sunken    */
+  --border: #2e2f31;       /* Border    */
+  --fg-primary: #ececec;   /* Ink       */
+  --fg-muted: #8a8c8e;     /* Ink Muted */
+  --fg-faint: #5b5d5f;     /* Ink Faint */
+  --fg-subtle: var(--border);
+
+  --accent: #00d4ff;
+  --accent-rgb: 0, 212, 255;
+  --accent-dim: rgba(var(--accent-rgb), 0.08);
+  --on-accent: #06232b; /* dark ink for text/icons on the light cyan accent */
+
+  --danger: #f87171;
+  --danger-rgb: 248, 113, 113;
+
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-raised: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-float: 0 20px 50px rgba(0, 0, 0, 0.5);
+
+  --canvas-gradient: radial-gradient(120% 80% at 50% -10%, #202123 0%, #18191a 55%, #141516 100%);
+
+  color-scheme: dark;
 }
 
 body {
   background: var(--bg-base);
   color: var(--fg-primary);
   font-family: var(--font-body), system-ui, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 * {
   box-sizing: border-box;
+}
+
+::selection {
+  background: var(--fg-primary);
+  color: var(--bg-surface);
 }
 
 ::-webkit-scrollbar {
@@ -41,7 +105,7 @@ body {
   background: var(--bg-surface);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--fg-subtle);
+  background: var(--fg-faint);
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {

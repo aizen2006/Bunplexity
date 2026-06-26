@@ -71,10 +71,11 @@ export default function SourcesTab({ messages, liveSources = [] }: SourcesTabPro
               hidden: { opacity: 0, y: 6 },
               show: { opacity: 1, y: 0, transition: { duration: 0.2 } },
             }}
-            className="flex items-start gap-3 p-3 rounded-lg group transition-colors duration-150"
+            className="flex items-start gap-3 p-3 rounded-[16px] group transition-colors duration-150"
             style={{
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--fg-subtle)',
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              boxShadow: 'var(--shadow-soft)',
             }}
             onMouseEnter={e =>
               ((e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--accent)')
@@ -85,7 +86,7 @@ export default function SourcesTab({ messages, liveSources = [] }: SourcesTabPro
           >
             <div
               className="flex items-center justify-center w-7 h-7 rounded-md flex-shrink-0"
-              style={{ background: 'var(--bg-surface)' }}
+              style={{ background: 'var(--bg-sunken)' }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img

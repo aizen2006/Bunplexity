@@ -37,9 +37,9 @@ function renderInline(text: string) {
           className="px-1 py-0.5 rounded text-xs"
           style={{
             fontFamily: 'var(--font-mono)',
-            background: 'var(--bg-surface)',
+            background: 'var(--bg-sunken)',
             color: 'var(--accent)',
-            border: '1px solid var(--fg-subtle)',
+            border: '1px solid var(--border)',
           }}
         >
           {part.slice(1, -1)}
@@ -78,11 +78,11 @@ function AssistantContent({ content, streaming }: { content: string; streaming?:
       blocks.push(
         <pre
           key={blocks.length}
-          className="rounded-lg p-4 my-3 overflow-x-auto text-sm leading-relaxed"
+          className="rounded-[14px] p-4 my-3 overflow-x-auto text-sm leading-relaxed"
           style={{
             fontFamily: 'var(--font-mono)',
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--fg-subtle)',
+            background: 'var(--bg-sunken)',
+            border: '1px solid var(--border)',
             borderLeft: '2px solid var(--accent)',
             color: 'var(--fg-primary)',
           }}
@@ -170,11 +170,12 @@ export default function MessageBubble({ role, content, streaming }: MessageBubbl
     >
       {role === 'user' ? (
         <div
-          className="max-w-[80%] px-4 py-2.5 rounded-2xl rounded-br-sm text-sm leading-relaxed"
+          className="max-w-[80%] px-4 py-2.5 rounded-2xl rounded-br-md text-sm leading-relaxed"
           style={{
-            background: 'var(--bg-elevated)',
+            background: 'var(--bg-sunken)',
             color: 'var(--fg-primary)',
-            border: '1px solid var(--fg-subtle)',
+            border: '1px solid var(--border)',
+            boxShadow: 'var(--shadow-soft)',
           }}
         >
           {content}

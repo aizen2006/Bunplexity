@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import ThemeToggle from '@/components/ThemeToggle';
 
 function GoogleIcon() {
   return (
@@ -66,24 +67,21 @@ function LoginContent() {
 
   return (
     <main
-      className="flex items-center justify-center min-h-screen px-4"
-      style={{
-        background: 'var(--bg-base)',
-        backgroundImage: `
-          linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)
-        `,
-        backgroundSize: '32px 32px',
-      }}
+      className="relative flex items-center justify-center min-h-screen px-4"
+      style={{ background: 'var(--canvas-gradient)' }}
     >
+      <div className="absolute top-5 right-5 z-10">
+        <ThemeToggle />
+      </div>
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.35, ease: 'easeOut' }}
-        className="w-full max-w-sm rounded-2xl p-8 space-y-8"
+        className="w-full max-w-sm rounded-[28px] p-8 space-y-8"
         style={{
           background: 'var(--bg-surface)',
-          border: '1px solid var(--fg-subtle)',
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-float)',
         }}
       >
         {/* Logo */}
@@ -108,17 +106,18 @@ function LoginContent() {
           <button
             onClick={() => signIn('google')}
             disabled={!!loading}
-            className="w-full flex items-center justify-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-3 py-2.5 rounded-full text-sm font-medium transition-all duration-150 disabled:opacity-50"
             style={{
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--fg-subtle)',
+              background: 'var(--bg-sunken)',
+              border: '1px solid var(--border)',
               color: 'var(--fg-primary)',
+              boxShadow: 'var(--shadow-soft)',
             }}
             onMouseEnter={e =>
               ((e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)')
             }
             onMouseLeave={e =>
-              ((e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--fg-subtle)')
+              ((e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)')
             }
           >
             <GoogleIcon />
@@ -128,17 +127,18 @@ function LoginContent() {
           <button
             onClick={() => signIn('github')}
             disabled={!!loading}
-            className="w-full flex items-center justify-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-3 py-2.5 rounded-full text-sm font-medium transition-all duration-150 disabled:opacity-50"
             style={{
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--fg-subtle)',
-              color: 'var(--fg-muted)',
+              background: 'var(--bg-sunken)',
+              border: '1px solid var(--border)',
+              color: 'var(--fg-primary)',
+              boxShadow: 'var(--shadow-soft)',
             }}
             onMouseEnter={e =>
               ((e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--fg-muted)')
             }
             onMouseLeave={e =>
-              ((e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--fg-subtle)')
+              ((e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)')
             }
           >
             <GitHubIcon />

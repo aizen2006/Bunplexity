@@ -96,7 +96,7 @@ export default function LibraryPage() {
             {error ? (
               <div
                 className="px-4 py-3 rounded-lg text-sm"
-                style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171' }}
+                style={{ background: 'rgba(var(--danger-rgb),0.1)', border: '1px solid rgba(var(--danger-rgb),0.3)', color: 'var(--danger)' }}
               >
                 {error}
               </div>

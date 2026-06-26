@@ -12,8 +12,8 @@ export default function FileChip({ file, onRemove }: FileChipProps) {
     <div
       className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm"
       style={{
-        background: 'rgba(0, 212, 255, 0.08)',
-        border: '1px solid rgba(0, 212, 255, 0.2)',
+        background: 'var(--accent-dim)',
+        border: '1px solid rgba(var(--accent-rgb), 0.2)',
         color: 'var(--fg-primary)',
         maxWidth: '100%',
       }}

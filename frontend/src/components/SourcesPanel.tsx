@@ -11,8 +11,8 @@ interface SourcesPanelProps {
 function SkeletonCard() {
   return (
     <div
-      className="h-16 rounded-lg animate-pulse"
-      style={{ background: 'var(--bg-elevated)' }}
+      className="h-16 rounded-[14px] animate-pulse"
+      style={{ background: 'var(--bg-sunken)' }}
     />
   );
 }
@@ -68,10 +68,11 @@ export default function SourcesPanel({ sources, loading = false }: SourcesPanelP
               hidden: { opacity: 0, y: 6 },
               show: { opacity: 1, y: 0, transition: { duration: 0.2 } },
             }}
-            className="flex items-start gap-2 p-2.5 rounded-lg group transition-colors duration-150"
+            className="flex items-start gap-2 p-2.5 rounded-[14px] group transition-colors duration-150"
             style={{
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--fg-subtle)',
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              boxShadow: 'var(--shadow-soft)',
             }}
             onMouseEnter={e =>
               ((e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--accent)')

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import ChatBar from '@/components/ChatBar';
+import ThemeToggle from '@/components/ThemeToggle';
 import { useAuth } from '@/hooks/useAuth';
 import type { ChatOptions } from '@/types';
 import { DEFAULT_CHAT_OPTIONS } from '@/types';
@@ -42,16 +43,12 @@ export default function Home() {
 
   return (
     <main
-      className="flex flex-col flex-1 items-center justify-center min-h-screen px-4"
-      style={{
-        background: 'var(--bg-base)',
-        backgroundImage: `
-          linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)
-        `,
-        backgroundSize: '40px 40px',
-      }}
+      className="relative flex flex-col flex-1 items-center justify-center min-h-screen px-4"
+      style={{ background: 'var(--canvas-gradient)' }}
     >
+      <div className="absolute top-5 right-5 z-10">
+        <ThemeToggle />
+      </div>
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
