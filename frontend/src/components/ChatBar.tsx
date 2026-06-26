@@ -25,7 +25,7 @@ interface ChatBarProps {
 function ModeToggle({ mode, onChange, pillId }: { mode: ChatMode; onChange: (m: ChatMode) => void; pillId: string }) {
   return (
     <div
-      className="relative flex items-center rounded-full p-0.5 select-none"
+      className="relative flex items-center h-8 rounded-full p-1 select-none"
       style={{ background: 'var(--bg-sunken)', border: '1px solid var(--border)' }}
     >
       {(['fast', 'thinking'] as const).map(m => (
@@ -33,7 +33,7 @@ function ModeToggle({ mode, onChange, pillId }: { mode: ChatMode; onChange: (m: 
           key={m}
           type="button"
           onClick={() => onChange(m)}
-          className="relative z-10 px-2.5 py-0.5 text-[11px] font-medium rounded-full transition-colors duration-150 capitalize"
+          className="relative z-10 flex items-center h-full px-3 text-[11px] font-medium rounded-full transition-colors duration-150 capitalize"
           style={{ color: mode === m ? 'var(--on-accent)' : 'var(--fg-muted)' }}
         >
           {m === 'fast' ? 'Fast' : 'Thinking'}
@@ -41,11 +41,11 @@ function ModeToggle({ mode, onChange, pillId }: { mode: ChatMode; onChange: (m: 
       ))}
       <motion.div
         layoutId={pillId}
-        className="absolute inset-y-0.5 rounded-full pointer-events-none"
+        className="absolute inset-y-1 rounded-full pointer-events-none"
         style={{
           background: 'var(--accent)',
-          width: 'calc(50% - 2px)',
-          left: mode === 'fast' ? '2px' : 'calc(50% + 0px)',
+          width: 'calc(50% - 4px)',
+          left: mode === 'fast' ? '4px' : '50%',
         }}
         transition={{ type: 'spring', stiffness: 500, damping: 35 }}
       />
