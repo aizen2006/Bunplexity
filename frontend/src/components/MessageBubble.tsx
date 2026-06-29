@@ -1,6 +1,8 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { Role } from '@/types';
 
 interface MessageBubbleProps {
@@ -26,128 +28,130 @@ export function parseAnswer(content: string): { answer: string; followUps: strin
   return { answer, followUps };
 }
 
-function renderInline(text: string) {
-  // Render inline `code` spans
-  const parts = text.split(/(`[^`]+`)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
-      return (
-        <code
-          key={i}
-          className="px-1 py-0.5 rounded text-xs"
-          style={{
-            fontFamily: 'var(--font-mono)',
-            background: 'var(--bg-sunken)',
-            color: 'var(--accent)',
-            border: '1px solid var(--border)',
-          }}
-        >
-          {part.slice(1, -1)}
-        </code>
-      );
-    }
-    return <span key={i}>{part}</span>;
-  });
+// Strip the answer/follow-up control tags for display — tolerant of partial
+// (still-streaming) output where the closing tag hasn't arrived yet.
+function cleanForDisplay(content: string): string {
+  return content
+    .replace(/<FOLLOW_UPS>[\s\S]*?(?:<\/FOLLOW_UPS>|$)/i, '')
+    .replace(/<\/?ANSWER>/gi, '')
+    .replace(/<\/?question>/gi, '')
+    .trim();
 }
 
-function AssistantContent({ content, streaming }: { content: string; streaming?: boolean }) {
-  const displayContent = streaming ? content : parseAnswer(content).answer;
-
-  const lines = displayContent.split('\n');
-  const blocks: React.ReactNode[] = [];
-  let i = 0;
-
-  while (i < lines.length) {
-    const line = lines[i];
-
-    // Skip XML tags from follow-ups block
-    if (line.startsWith('<') && (line.includes('FOLLOW_UPS') || line.includes('question') || line.includes('ANSWER'))) {
-      i++;
-      continue;
+const markdownComponents: Components = {
+  h1: ({ children }) => (
+    <h2 className="text-lg font-bold mt-4 mb-2 first:mt-0" style={{ fontFamily: 'var(--font-heading)', color: 'var(--fg-primary)' }}>
+      {children}
+    </h2>
+  ),
+  h2: ({ children }) => (
+    <h3 className="text-base font-bold mt-4 mb-1.5 first:mt-0" style={{ fontFamily: 'var(--font-heading)', color: 'var(--fg-primary)' }}>
+      {children}
+    </h3>
+  ),
+  h3: ({ children }) => (
+    <h4 className="text-sm font-semibold mt-3 mb-1 first:mt-0" style={{ fontFamily: 'var(--font-heading)', color: 'var(--fg-primary)' }}>
+      {children}
+    </h4>
+  ),
+  p: ({ children }) => (
+    <p className="leading-relaxed" style={{ color: 'var(--fg-primary)' }}>{children}</p>
+  ),
+  strong: ({ children }) => (
+    <strong className="font-semibold" style={{ color: 'var(--fg-primary)' }}>{children}</strong>
+  ),
+  em: ({ children }) => <em className="italic">{children}</em>,
+  a: ({ children, href }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="underline underline-offset-2 transition-opacity hover:opacity-80"
+      style={{ color: 'var(--accent)' }}
+    >
+      {children}
+    </a>
+  ),
+  ul: ({ children }) => (
+    <ul className="list-disc pl-5 space-y-1 marker:text-[color:var(--fg-faint)]" style={{ color: 'var(--fg-primary)' }}>
+      {children}
+    </ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="list-decimal pl-5 space-y-1 marker:text-[color:var(--fg-muted)]" style={{ color: 'var(--fg-primary)' }}>
+      {children}
+    </ol>
+  ),
+  li: ({ children }) => <li className="leading-relaxed pl-1">{children}</li>,
+  blockquote: ({ children }) => (
+    <blockquote
+      className="my-3 pl-3 py-1 italic"
+      style={{ borderLeft: '3px solid var(--accent)', color: 'var(--fg-muted)' }}
+    >
+      {children}
+    </blockquote>
+  ),
+  hr: () => <hr className="my-4" style={{ borderColor: 'var(--border)' }} />,
+  pre: ({ children }) => (
+    <pre
+      className="rounded-[14px] p-4 my-3 overflow-x-auto text-sm leading-relaxed"
+      style={{
+        fontFamily: 'var(--font-mono)',
+        background: 'var(--bg-sunken)',
+        border: '1px solid var(--border)',
+        borderLeft: '2px solid var(--accent)',
+        color: 'var(--fg-primary)',
+      }}
+    >
+      {children}
+    </pre>
+  ),
+  code: ({ className, children, ...props }) => {
+    const isBlock = /language-/.test(className ?? '') || String(children).includes('\n');
+    if (isBlock) {
+      // Rendered inside the styled <pre> wrapper above.
+      return <code className={className} {...props}>{children}</code>;
     }
-
-    // Code block
-    if (line.startsWith('```')) {
-      const lang = line.slice(3).trim();
-      const codeLines: string[] = [];
-      i++;
-      while (i < lines.length && !lines[i].startsWith('```')) {
-        codeLines.push(lines[i]);
-        i++;
-      }
-      blocks.push(
-        <pre
-          key={blocks.length}
-          className="rounded-[14px] p-4 my-3 overflow-x-auto text-sm leading-relaxed"
-          style={{
-            fontFamily: 'var(--font-mono)',
-            background: 'var(--bg-sunken)',
-            border: '1px solid var(--border)',
-            borderLeft: '2px solid var(--accent)',
-            color: 'var(--fg-primary)',
-          }}
-        >
-          {lang && (
-            <span
-              className="block text-xs mb-2 uppercase tracking-wider"
-              style={{ color: 'var(--accent)' }}
-            >
-              {lang}
-            </span>
-          )}
-          <code>{codeLines.join('\n')}</code>
-        </pre>
-      );
-      i++;
-      continue;
-    }
-
-    // Heading
-    if (line.startsWith('## ')) {
-      blocks.push(
-        <h3
-          key={blocks.length}
-          className="text-base font-bold mt-4 mb-1"
-          style={{ fontFamily: 'var(--font-heading)', color: 'var(--fg-primary)' }}
-        >
-          {line.slice(3)}
-        </h3>
-      );
-      i++;
-      continue;
-    }
-    if (line.startsWith('# ')) {
-      blocks.push(
-        <h2
-          key={blocks.length}
-          className="text-lg font-bold mt-4 mb-2"
-          style={{ fontFamily: 'var(--font-heading)', color: 'var(--fg-primary)' }}
-        >
-          {line.slice(2)}
-        </h2>
-      );
-      i++;
-      continue;
-    }
-
-    // Empty line
-    if (!line.trim()) {
-      i++;
-      continue;
-    }
-
-    // Regular paragraph
-    blocks.push(
-      <p key={blocks.length} className="leading-relaxed" style={{ color: 'var(--fg-primary)' }}>
-        {renderInline(line)}
-      </p>
+    return (
+      <code
+        className="px-1 py-0.5 rounded text-[0.85em]"
+        style={{
+          fontFamily: 'var(--font-mono)',
+          background: 'var(--bg-sunken)',
+          color: 'var(--accent)',
+          border: '1px solid var(--border)',
+        }}
+        {...props}
+      >
+        {children}
+      </code>
     );
-    i++;
-  }
+  },
+  table: ({ children }) => (
+    <div className="my-3 overflow-x-auto">
+      <table className="w-full text-sm border-collapse" style={{ color: 'var(--fg-primary)' }}>
+        {children}
+      </table>
+    </div>
+  ),
+  th: ({ children }) => (
+    <th className="text-left font-semibold px-3 py-1.5" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-sunken)' }}>
+      {children}
+    </th>
+  ),
+  td: ({ children }) => (
+    <td className="px-3 py-1.5" style={{ borderBottom: '1px solid var(--border)' }}>{children}</td>
+  ),
+};
+
+function AssistantContent({ content, streaming }: { content: string; streaming?: boolean }) {
+  const displayContent = cleanForDisplay(streaming ? content : parseAnswer(content).answer);
 
   return (
     <div className="space-y-2 text-sm">
-      {blocks}
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+        {displayContent}
+      </ReactMarkdown>
       {streaming && (
         <motion.span
           animate={{ opacity: [1, 0, 1] }}
@@ -170,7 +174,7 @@ export default function MessageBubble({ role, content, streaming }: MessageBubbl
     >
       {role === 'user' ? (
         <div
-          className="max-w-[80%] px-4 py-2.5 rounded-2xl rounded-br-md text-sm leading-relaxed"
+          className="max-w-[80%] px-4 py-2.5 rounded-2xl rounded-br-md text-sm leading-relaxed whitespace-pre-wrap"
           style={{
             background: 'var(--bg-sunken)',
             color: 'var(--fg-primary)',
